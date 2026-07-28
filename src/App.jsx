@@ -3,6 +3,7 @@ import Header from './components/Header';
 import ShopSphereApp from './sandboxes/ShopSphereApp';
 import DeskFlowApp from './sandboxes/DeskFlowApp';
 import SkyRoutesApp from './sandboxes/SkyRoutesApp';
+import TaskFlowApp from './sandboxes/TaskFlowApp';
 import QuizSection from './components/QuizSection';
 import InterviewerDashboard from './components/InterviewerDashboard';
 import BugReportModal from './components/BugReportModal';
@@ -408,6 +409,10 @@ export default function App() {
 
                 {activeTab === 'sky' && (
                   <SkyRoutesApp activeBugs={activeBugIds} addLog={addLog} />
+                )}
+
+                {activeTab === 'task' && (
+                  <TaskFlowApp activeBugs={activeBugIds} addLog={addLog} />
                 )}
 
                 {activeTab === 'quiz' && (

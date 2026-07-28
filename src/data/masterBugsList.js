@@ -172,5 +172,59 @@ export const MASTER_BUGS = [
     expectedBehavior: 'Minimum 1 passenger (Adult) must be required to search or book flights.',
     hint: 'Reduce adult passengers to 0 and search.',
     defaultEnabled: true
+  },
+
+  // TaskFlow Messaging Sandbox
+  {
+    id: 'task_progress_calc',
+    appId: 'task',
+    appName: 'TaskFlow Dashboard',
+    title: 'Progress bar calculates completion as 120% when task completed',
+    category: 'Calculation / Logic',
+    severity: 'Medium',
+    description: 'Marking all checklist tasks as done increments progress bar past 100%, displaying 120% completion.',
+    howToReproduce: 'Navigate to TaskFlow tab, click checkbox next to all subtasks under "Staging Deployment Checklist". Observe percentage bar reads 120%.',
+    expectedBehavior: 'Completion progress calculation should be capped at 100%.',
+    hint: 'Check all checkboxes in the active checklist task.',
+    defaultEnabled: true
+  },
+  {
+    id: 'task_priority_reset',
+    appId: 'task',
+    appName: 'TaskFlow Dashboard',
+    title: 'Editing task title resets priority flag back to Low automatically',
+    category: 'Functional / State Mutation',
+    severity: 'High',
+    description: 'When changing the title of a task marked as "Urgent" or "Medium", the task details form resets priority back to "Low" silently on save.',
+    howToReproduce: 'Select the task "QA Build Review", edit its title, verify priority is set to Medium, and click save. The priority changes back to Low.',
+    expectedBehavior: 'State must preserve all previous values during editing.',
+    hint: 'Edit a task name and check if its priority flag is preserved.',
+    defaultEnabled: true
+  },
+  {
+    id: 'task_xss_desc',
+    appId: 'task',
+    appName: 'TaskFlow Dashboard',
+    title: 'New Task Description field is vulnerable to unescaped HTML injections (XSS)',
+    category: 'Security / Data Sanitization',
+    severity: 'Critical',
+    description: 'Creating a new task with custom HTML layout inside description renders unescaped styling and script blocks in cards.',
+    howToReproduce: 'Create a new task, insert HTML (e.g. <mark>Bug</mark>) in description, click add. View card rendering.',
+    expectedBehavior: 'Input strings must be escaped during display to avoid visual DOM injection.',
+    hint: 'Insert visual tags in description and click add task.',
+    defaultEnabled: true
+  },
+  {
+    id: 'task_scroll_overlap',
+    appId: 'task',
+    appName: 'TaskFlow Dashboard',
+    title: 'Team chat panel hides newest messages due to missing scroll container',
+    category: 'UI / UX Layout',
+    severity: 'Low',
+    description: 'The live team chat log container has missing vertical overflow styles, causing new messages to be pushed off the screen without a scrollbar.',
+    howToReproduce: 'Type and send 4 or 5 new chat messages. Observe scroll container does not allow scrolling down to view them.',
+    expectedBehavior: 'Chat panel should support scroll-y and auto-scroll to the newest message.',
+    hint: 'Send multiple messages in the live chat module.',
+    defaultEnabled: true
   }
 ];

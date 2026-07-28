@@ -71,6 +71,12 @@ export default function Header({
               <Plane className="w-3.5 h-3.5" /> SkyRoutes
             </button>
             <button
+              onClick={() => setActiveTab('task')}
+              className={`px-3 py-1.5 rounded-lg font-medium flex items-center gap-1.5 transition ${activeTab === 'task' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'}`}
+            >
+              <span className="w-3.5 h-3.5 flex items-center justify-center font-bold">📋</span> TaskFlow
+            </button>
+            <button
               onClick={() => setActiveTab('quiz')}
               className={`px-3 py-1.5 rounded-lg font-medium flex items-center gap-1.5 transition ${activeTab === 'quiz' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'}`}
             >

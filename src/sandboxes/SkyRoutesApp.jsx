@@ -152,7 +152,9 @@ export default function SkyRoutesApp({ activeBugs, addLog }) {
                 required
                 value={departDate}
                 onChange={(e) => setDepartDate(e.target.value)}
-                className="w-full p-2.5 glass-input rounded-lg text-slate-200"
+                onClick={(e) => e.target.showPicker && e.target.showPicker()}
+                onFocus={(e) => e.target.showPicker && e.target.showPicker()}
+                className="w-full p-2.5 glass-input rounded-lg text-slate-200 cursor-pointer"
               />
             </div>
             <div>
@@ -164,7 +166,9 @@ export default function SkyRoutesApp({ activeBugs, addLog }) {
                 required
                 value={returnDate}
                 onChange={(e) => setReturnDate(e.target.value)}
-                className="w-full p-2.5 glass-input rounded-lg text-slate-200"
+                onClick={(e) => e.target.showPicker && e.target.showPicker()}
+                onFocus={(e) => e.target.showPicker && e.target.showPicker()}
+                className="w-full p-2.5 glass-input rounded-lg text-slate-200 cursor-pointer"
               />
               <p className="text-[10px] text-slate-500 mt-1">Compare return date with departure date</p>
             </div>
