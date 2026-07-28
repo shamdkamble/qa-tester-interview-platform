@@ -1,0 +1,176 @@
+export const MASTER_BUGS = [
+  // ShopSphere Apps
+  {
+    id: 'shop_discount_flat',
+    appId: 'shop',
+    appName: 'ShopSphere E-Commerce',
+    title: 'Coupon Code "SAVE20" subtracts flat $20 instead of 20%',
+    category: 'Calculation / Logic',
+    severity: 'Medium',
+    description: 'When applying discount code "SAVE20", the system deducts $20 flat amount regardless of total order value instead of taking 20% off.',
+    howToReproduce: 'Add items worth $200 to cart. Apply promo code "SAVE20". Total becomes $180 instead of expected $160.',
+    expectedBehavior: 'Coupon SAVE20 should calculate 20% off total cart value ($200 * 0.20 = $40 discount).',
+    hint: 'Check cart subtotal calculation when promo code is SAVE20.',
+    defaultEnabled: true
+  },
+  {
+    id: 'shop_negative_qty',
+    appId: 'shop',
+    appName: 'ShopSphere E-Commerce',
+    title: 'Cart item quantity accepts negative numbers & decimals',
+    category: 'Boundary Value Analysis',
+    severity: 'High',
+    description: 'Entering a negative quantity (e.g. -5) or decimal (e.g. 1.5) in the item quantity field reduces total cost or results in invalid cart totals.',
+    howToReproduce: 'In cart, manually type "-2" or "0.5" into item quantity input field.',
+    expectedBehavior: 'Quantity input should reject negative numbers and non-integers, enforcing min value 1 with validation message.',
+    hint: 'Type -5 into the quantity box for any cart item.',
+    defaultEnabled: true
+  },
+  {
+    id: 'shop_checkout_overflow',
+    appId: 'shop',
+    appName: 'ShopSphere E-Commerce',
+    title: 'Checkout button overlaps with footer on mobile view (< 640px)',
+    category: 'UI / UX Responsive',
+    severity: 'Low',
+    description: 'On mobile viewports, the sticky checkout summary box gets cut off or overlaps with the page footer elements.',
+    howToReproduce: 'Switch viewport to mobile size (or narrow browser window < 640px) and view cart summary sticky container.',
+    expectedBehavior: 'Checkout button should remain fully visible, accessible, and properly padded on all device screen sizes.',
+    hint: 'Resize window to mobile width and open cart drawer.',
+    defaultEnabled: true
+  },
+  {
+    id: 'shop_card_validation',
+    appId: 'shop',
+    appName: 'ShopSphere E-Commerce',
+    title: 'Credit Card field accepts short numbers & alphabets',
+    category: 'Form Validation',
+    severity: 'High',
+    description: 'Payment form allows placing order with 4-digit credit card number and non-numeric letters (e.g. "ABCD-1234").',
+    howToReproduce: 'Proceed to Checkout, enter "testcard" in Card Number field, fill dummy name and submit order.',
+    expectedBehavior: 'Card field should enforce 16-digit Luhn / numeric validation before allowing order submission.',
+    hint: 'Try placing order with non-numeric text in Credit Card field.',
+    defaultEnabled: true
+  },
+  {
+    id: 'shop_subtotal_refresh',
+    appId: 'shop',
+    appName: 'ShopSphere E-Commerce',
+    title: 'Removing last item does not clear order subtotal until reload',
+    category: 'Functional / State',
+    severity: 'Medium',
+    description: 'When deleting the final item from the shopping cart, the cart displays empty message but the subtotal header still displays previous dollar amount.',
+    howToReproduce: 'Add 1 item to cart. Click Trash/Remove icon. Cart list empties, but "Subtotal: $XX" stays visible.',
+    expectedBehavior: 'Removing all items should reset subtotal, tax, and total to $0.00 instantly.',
+    hint: 'Add 1 item, then remove it and check subtotal text.',
+    defaultEnabled: true
+  },
+
+  // DeskFlow Apps
+  {
+    id: 'desk_password_rule',
+    appId: 'desk',
+    appName: 'DeskFlow User Portal',
+    title: 'Password accepts simple text despite helper text claiming special character required',
+    category: 'Form Validation Inconsistency',
+    severity: 'Medium',
+    description: 'Helper text under password field states "Must contain at least 1 special character (!@#$)", but form successfully submits with "password123".',
+    howToReproduce: 'Fill registration form with password "simplepass1". Observe green checkmark and successful signup.',
+    expectedBehavior: 'Form validation logic must match advertised requirements or update helper instructions.',
+    hint: 'Try signing up with a password without any special character.',
+    defaultEnabled: true
+  },
+  {
+    id: 'desk_dob_future',
+    appId: 'desk',
+    appName: 'DeskFlow User Portal',
+    title: 'Date of Birth field accepts future dates (e.g. Year 2030)',
+    category: 'Equivalence Partitioning / Logic',
+    severity: 'High',
+    description: 'Registration form allows user to pick a Date of Birth in the future (e.g., year 2028 or 2030), calculating age as negative.',
+    howToReproduce: 'Select DOB input, set date to 05/12/2030, and submit registration.',
+    expectedBehavior: 'Date of birth field should set max date attribute to today and reject future dates.',
+    hint: 'Pick a future date in Date of Birth field.',
+    defaultEnabled: true
+  },
+  {
+    id: 'desk_double_submit',
+    appId: 'desk',
+    appName: 'DeskFlow User Portal',
+    title: 'Submit button remains active during submission allowing duplicate user creation',
+    category: 'Concurrency / UI State',
+    severity: 'Critical',
+    description: 'The "Create Account" button is not disabled while processing async request. Fast double-clicking creates duplicate account records.',
+    howToReproduce: 'Fill registration form and rapidly click "Create Account" 2 or 3 times.',
+    expectedBehavior: 'Submit button should immediately disable and show loading spinner upon first click.',
+    hint: 'Click the Create Account button rapidly multiple times.',
+    defaultEnabled: true
+  },
+  {
+    id: 'desk_xss_display',
+    appId: 'desk',
+    appName: 'DeskFlow User Portal',
+    title: 'Profile Full Name field renders unescaped HTML tags (XSS Flaw)',
+    category: 'Security / Data Sanitization',
+    severity: 'Critical',
+    description: 'Entering HTML markup such as `<h1>Test User</h1>` or `<b>John</b>` into Full Name field renders raw formatted HTML on profile page.',
+    howToReproduce: 'In profile setup, enter `<h1>QA Intern</h1>` as name and click Save Profile.',
+    expectedBehavior: 'User input must be sanitized and rendered strictly as plain escaped text string.',
+    hint: 'Enter HTML tags like <h1>Test</h1> or <mark>Alert</mark> in Full Name.',
+    defaultEnabled: true
+  },
+  {
+    id: 'desk_console_error',
+    appId: 'desk',
+    appName: 'DeskFlow User Portal',
+    title: 'Clicking "Sync Cloud Data" throws unhandled TypeError in Console',
+    category: 'Console / Error Logging',
+    severity: 'Medium',
+    description: 'Clicking "Sync Cloud Data" button under Settings tab fails silently in UI but throws `Uncaught TypeError: Cannot read properties of undefined (reading "syncState")` in developer console.',
+    howToReproduce: 'Open Dev Console (or bottom Console Simulator), navigate to Settings tab, click "Sync Cloud Data".',
+    expectedBehavior: 'Action should complete gracefully with user feedback modal or handled error toast.',
+    hint: 'Open DevTools console and click Sync Cloud Data in Settings.',
+    defaultEnabled: true
+  },
+
+  // SkyRoutes Apps
+  {
+    id: 'sky_return_date',
+    appId: 'sky',
+    appName: 'SkyRoutes Flight Booking',
+    title: 'Return flight date can be selected BEFORE departure date',
+    category: 'Logic / Validation',
+    severity: 'High',
+    description: 'Flight search engine allows selecting Departure Date as Aug 20 and Return Date as Aug 10 without validation error.',
+    howToReproduce: 'Set Departure Date = 25th Aug, Set Return Date = 15th Aug. Click Search Flights.',
+    expectedBehavior: 'Return date selector should disable all dates prior to selected departure date.',
+    hint: 'Set return date earlier than departure date.',
+    defaultEnabled: true
+  },
+  {
+    id: 'sky_currency_double',
+    appId: 'sky',
+    appName: 'SkyRoutes Flight Booking',
+    title: 'Switching currency from USD to EUR applies conversion rate twice',
+    category: 'Calculation / Logic',
+    severity: 'Medium',
+    description: 'When toggling currency from USD ($500) to EUR, price converts to €450, but switching USD->EUR->USD inflates USD price to $555.',
+    howToReproduce: 'Note initial USD flight price ($500). Toggle to EUR then toggle back to USD. New price becomes $555.',
+    expectedBehavior: 'Currency conversion should reference fixed base rate instead of mutating base price continuously.',
+    hint: 'Toggle currency switcher back and forth 2-3 times.',
+    defaultEnabled: true
+  },
+  {
+    id: 'sky_passenger_zero',
+    appId: 'sky',
+    appName: 'SkyRoutes Flight Booking',
+    title: 'Flight can be searched & booked with 0 Passengers',
+    category: 'Boundary Value Analysis',
+    severity: 'Medium',
+    description: 'Decreasing Adult passenger count to 0 allows clicking "Search Flights" and proceeding to confirmation page with $0 fare.',
+    howToReproduce: 'In passenger dropdown, click minus button until Adults count is 0. Click Search Flights.',
+    expectedBehavior: 'Minimum 1 passenger (Adult) must be required to search or book flights.',
+    hint: 'Reduce adult passengers to 0 and search.',
+    defaultEnabled: true
+  }
+];
