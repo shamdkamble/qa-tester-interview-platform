@@ -9,13 +9,16 @@ import BugReportModal from './components/BugReportModal';
 import ConsoleSimulator from './components/ConsoleSimulator';
 import ScorecardModal from './components/ScorecardModal';
 import { MASTER_BUGS } from './data/masterBugsList';
-import { User, Shield, HelpCircle, ArrowRight } from 'lucide-react';
+import { User, Shield, HelpCircle, ArrowRight, Play, CheckCircle, Clock, AlertTriangle, Bug } from 'lucide-react';
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userRole, setUserRole] = useState(null); // 'candidate' | 'admin'
   const [mode, setMode] = useState('candidate'); // 'candidate' | 'interviewer'
   const [activeTab, setActiveTab] = useState('shop'); // 'shop' | 'desk' | 'sky' | 'quiz'
+
+  // Instructions screen state for candidate
+  const [showInstructions, setShowInstructions] = useState(false);
 
   // Timer states
   const [timeLeft, setTimeLeft] = useState(1800); // 30 minutes (1800s)
@@ -91,8 +94,13 @@ export default function App() {
     setUserRole('candidate');
     setMode('candidate');
     setIsLoggedIn(true);
-    setTimerActive(true);
-    addLog('info', 'Assessment System', `Candidate "${studentNameInput}" started 30-minute testing session.`);
+    setShowInstructions(true); // Show instructions page first!
+  };
+
+  const handleStartCandidateTest = () => {
+    setShowInstructions(false);
+    setTimerActive(true); // Only start timer now!
+    addLog('info', 'Assessment System', `Candidate "${candidateName}" acknowledged instructions and started the 30-minute test.`);
   };
 
   const handleAdminLogin = (e) => {
@@ -125,6 +133,7 @@ export default function App() {
     setCandidateBugs([]);
     setTimeLeft(1800);
     setTimerActive(false);
+    setShowInstructions(false);
   };
 
   // Render Login Screen if not authenticated
@@ -149,7 +158,7 @@ export default function App() {
               </div>
               <div>
                 <h2 className="text-lg font-bold">Student / Candidate</h2>
-                <p className="text-xs text-slate-400">Sign in to begin the 30-min bug hunting assessment</p>
+                <p className="text-xs text-slate-400">Sign in to review guidelines and begin the assessment</p>
               </div>
             </div>
 
@@ -179,17 +188,15 @@ export default function App() {
               </div>
 
               <div className="bg-slate-900/60 p-3.5 rounded-xl border border-slate-800 text-[11px] text-slate-400 leading-relaxed space-y-1">
-                <strong className="text-slate-300 block">Assessment Instructions:</strong>
-                <p>• You have <strong>30 minutes</strong> to find hidden bugs across 3 apps.</p>
-                <p>• Log defect reports and complete the QA quiz before submitting.</p>
-                <p>• System will auto-submit when the countdown reaches zero.</p>
+                <strong className="text-slate-300 block">Quick Note:</strong>
+                <p>Logging in will take you to a detailed instruction and guidelines screen before your 30-minute timer starts.</p>
               </div>
 
               <button
                 type="submit"
                 className="w-full py-3 bg-gradient-to-r from-emerald-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 text-white font-bold rounded-xl shadow-lg transition flex items-center justify-center gap-2 text-xs"
               >
-                Start Technical Assessment <ArrowRight className="w-4.5 h-4.5" />
+                Continue to Instructions <ArrowRight className="w-4.5 h-4.5" />
               </button>
             </form>
           </div>
@@ -238,6 +245,101 @@ export default function App() {
                 Access Interview Dashboard <ArrowRight className="w-4.5 h-4.5" />
               </button>
             </form>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Render Candidate Instructions screen if logged in but test hasn't started yet
+  if (isLoggedIn && userRole === 'candidate' && showInstructions) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-center items-center p-4 md:p-6">
+        <div className="max-w-3xl w-full glass-panel-glow p-6 md:p-8 rounded-2xl border border-indigo-500/30 space-y-6">
+          {/* Header */}
+          <div className="text-center pb-4 border-b border-slate-800">
+            <h2 className="text-xl md:text-2xl font-extrabold text-white">Welcome, {candidateName}!</h2>
+            <p className="text-xs text-slate-400 mt-1">Please read the following instructions carefully before starting the test.</p>
+          </div>
+
+          {/* Core Info Blocks */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs font-mono">
+            <div className="p-3 bg-slate-900/70 rounded-xl border border-slate-800 flex items-center gap-2.5">
+              <Clock className="w-5 h-5 text-amber-400 shrink-0" />
+              <div>
+                <span className="text-[10px] text-slate-500 block">DURATION</span>
+                <span className="text-slate-200 font-bold">30 Minutes</span>
+              </div>
+            </div>
+
+            <div className="p-3 bg-slate-900/70 rounded-xl border border-slate-800 flex items-center gap-2.5">
+              <Bug className="w-5 h-5 text-rose-400 shrink-0" />
+              <div>
+                <span className="text-[10px] text-slate-500 block">SANDBOXES</span>
+                <span className="text-slate-200 font-bold">3 Simulated Apps</span>
+              </div>
+            </div>
+
+            <div className="p-3 bg-slate-900/70 rounded-xl border border-slate-800 flex items-center gap-2.5">
+              <CheckCircle className="w-5 h-5 text-emerald-400 shrink-0" />
+              <div>
+                <span className="text-[10px] text-slate-500 block">SUBMISSION</span>
+                <span className="text-slate-200 font-bold">Automatic Scoring</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Detailed Instructions list */}
+          <div className="space-y-4 text-xs leading-relaxed text-slate-300">
+            <div className="space-y-2.5">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                Task 1: The Bug Hunt (3 Sandbox Apps)
+              </h3>
+              <p className="pl-3.5">
+                Explore the different sections of the platform using the top nav tabs:
+                🛒 <strong className="text-slate-200">ShopSphere</strong>, 👥 <strong className="text-slate-200">DeskFlow</strong>, and ✈️ <strong className="text-slate-200">SkyRoutes</strong>.
+                Your goal is to test inputs, calculations, responsive views, dates, and look at the bottom console for uncaught JavaScript errors.
+              </p>
+            </div>
+
+            <div className="space-y-2.5">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                Task 2: Logging Defects
+              </h3>
+              <p className="pl-3.5">
+                When you find an issue, click the red <strong className="text-rose-400">"Report Defect"</strong> button in the top-right header.
+                You <strong className="text-amber-400">must map your report to the correct suspected area</strong> in the dropdown so the grading engine can automatically check and score your report. Complete the steps to reproduce, actual and expected outcomes clearly.
+              </p>
+            </div>
+
+            <div className="space-y-2.5">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                Task 3: Theoretical MCQ Quiz
+              </h3>
+              <p className="pl-3.5">
+                Make sure to navigate to the <strong className="text-slate-200">"Theory Quiz"</strong> tab and answer the 8 multiple-choice testing methodology questions before your session finishes.
+              </p>
+            </div>
+
+            <div className="p-3 bg-indigo-950/40 border border-indigo-900 rounded-xl flex items-start gap-2.5 text-[11px] text-indigo-300 leading-normal">
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>
+                <strong>Warning on Timer:</strong> Once you click start, the 30-minute timer will run continuously. If you run out of time, the platform will immediately lock and evaluate whatever you have completed up to that point.
+              </span>
+            </div>
+          </div>
+
+          {/* Action Button */}
+          <div className="pt-2 border-t border-slate-800 flex justify-end">
+            <button
+              onClick={handleStartCandidateTest}
+              className="px-8 py-3.5 bg-gradient-to-r from-emerald-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 text-white font-bold rounded-xl shadow-lg transition flex items-center gap-2 text-xs animate-pulse-glow"
+            >
+              <Play className="w-4 h-4 fill-white" /> I Understand, Start Test Now
+            </button>
           </div>
         </div>
       </div>
