@@ -12,19 +12,17 @@ import ScorecardModal from './components/ScorecardModal';
 import { MASTER_BUGS } from './data/masterBugsList';
 import { ADMIN_PIN } from './config/auth';
 import {
-  RESTRICTED_ACCESS,
-  INVITED_EMAIL,
-  validateInvitedAccess,
-  isAccessWindowOpen,
-  getSecondsUntilAccessExpiry,
-  formatAccessDeadline
-} from './config/access';
+  validateAccessToken,
+  recordTokenRedemption,
+  formatExpiry,
+  secondsUntil
+} from './utils/accessTokens';
 import { computeAssessmentScore } from './utils/scoring';
 import { addSubmission } from './utils/submissionsStore';
 import {
   User, Shield, HelpCircle, ArrowRight, Play, CheckCircle, Clock,
   AlertTriangle, Bug, Sun, Moon, Sparkles, BookOpen, LogOut,
-  ListChecks, Award, FileWarning, Terminal, KeyRound, Lock
+  ListChecks, Award, FileWarning, Terminal, KeyRound
 } from 'lucide-react';
 
 export default function App() {
@@ -68,6 +66,7 @@ export default function App() {
   const [studentEmailInput, setStudentEmailInput] = useState('');
   const [accessTokenInput, setAccessTokenInput] = useState('');
   const [candidateLoginError, setCandidateLoginError] = useState('');
+  const [candidateStep, setCandidateStep] = useState('details'); // 'details' | 'token'
   const [adminPinInput, setAdminPinInput] = useState('');
   const [adminPinError, setAdminPinError] = useState(false);
   const [loginTab, setLoginTab] = useState('candidate'); // 'candidate' | 'admin'
@@ -81,6 +80,8 @@ export default function App() {
   const [candidateName, setCandidateName] = useState('QA Fresher Candidate');
   const [candidateEmail, setCandidateEmail] = useState('');
   const [quizScore, setQuizScore] = useState({ score: 0, total: 8 });
+  /** Validated token session: { token, exp, jti } */
+  const [tokenSession, setTokenSession] = useState(null);
 
   // Latest session snapshot for deadline auto-submit (avoids stale closures)
   const sessionRef = useRef({});
@@ -93,7 +94,8 @@ export default function App() {
     activeBugIds,
     timeLeft,
     userRole,
-    isLoggedIn
+    isLoggedIn,
+    tokenSession
   };
 
   // Console logs
@@ -148,35 +150,52 @@ export default function App() {
     addLog('info', 'Candidate Reporter', `New Defect Logged: "${newBugReport.title}" (${newBugReport.severity})`);
   };
 
-  const handleStudentLogin = (e) => {
+  /** Step 1: name + email → ask for token */
+  const handleCandidateDetailsContinue = (e) => {
     e.preventDefault();
     setCandidateLoginError('');
     if (!studentNameInput.trim() || !studentEmailInput.trim()) return;
+    setCandidateStep('token');
+  };
 
-    if (RESTRICTED_ACCESS) {
-      const result = validateInvitedAccess({
-        email: studentEmailInput,
-        token: accessTokenInput
-      });
-      if (!result.ok) {
-        setCandidateLoginError(result.error);
-        return;
-      }
+  /** Step 2: validate admin-issued token */
+  const handleCandidateTokenSubmit = (e) => {
+    e.preventDefault();
+    setCandidateLoginError('');
+
+    const result = validateAccessToken(accessTokenInput);
+    if (!result.ok) {
+      setCandidateLoginError(result.error);
+      return;
     }
 
-    setCandidateName(studentNameInput.trim());
-    setCandidateEmail(studentEmailInput.trim());
+    const name = studentNameInput.trim();
+    const email = studentEmailInput.trim();
+    const token = accessTokenInput.trim();
+
+    recordTokenRedemption(token, { email, name });
+
+    setCandidateName(name);
+    setCandidateEmail(email);
+    setTokenSession({
+      token,
+      exp: result.payload.exp,
+      jti: result.payload.jti,
+      secondsRemaining: result.secondsRemaining
+    });
     setUserRole('candidate');
     setMode('candidate');
     setIsLoggedIn(true);
     setShowInstructions(true);
     setAccessExpiredNotice(false);
+    addLog('info', 'Access Gate', `Token accepted for ${email}. Valid until ${formatExpiry(result.payload.exp)}.`);
   };
 
   const handleStartCandidateTest = () => {
-    // Assessment runs until access deadline (6 PM IST), not a fixed 30-min only window
-    const secs = RESTRICTED_ACCESS
-      ? Math.max(60, getSecondsUntilAccessExpiry())
+    // Session length = remaining token validity (max 4h from generation)
+    const exp = tokenSession?.exp;
+    const secs = exp
+      ? Math.max(60, secondsUntil(exp))
       : 1800;
     setTimeLeft(secs);
     setShowInstructions(false);
@@ -184,13 +203,12 @@ export default function App() {
     addLog(
       'info',
       'Assessment System',
-      `Candidate "${candidateName}" started the assessment. Access deadline: ${formatAccessDeadline()}.`
+      `Candidate "${candidateName}" started the assessment. Token expires ${exp ? formatExpiry(exp) : 'N/A'}.`
     );
   };
 
   const handleAdminLogin = (e) => {
     e.preventDefault();
-    // Admin remains fully available (not blocked by candidate restriction)
     if (adminPinInput === ADMIN_PIN) {
       setUserRole('admin');
       setMode('interviewer');
@@ -230,7 +248,7 @@ export default function App() {
         activeMasterBugs: activeMaster,
         scoring,
         timeLeft: remaining,
-        durationSeconds: RESTRICTED_ACCESS ? getSecondsUntilAccessExpiry() + remaining : 1800,
+        accessTokenJti: snap.tokenSession?.jti || null,
         submitReason: reason
       });
       addLog('info', 'Report Archive', `Submission saved — ${name} (${scoring.composite}%, ${scoring.grade}).`);
@@ -245,9 +263,9 @@ export default function App() {
     setShowSubmitConfirm(false);
     setIsReportModalOpen(false);
 
-    if (reason === 'access_deadline') {
+    if (reason === 'token_expired') {
       setAccessExpiredNotice(true);
-      addLog('warn', 'Assessment System', 'Access deadline reached (6:00 PM IST). Assessment auto-submitted.');
+      addLog('warn', 'Assessment System', 'Access token expired. Assessment auto-submitted.');
     } else {
       addLog('warn', 'Assessment System', 'Assessment session ended. Auto-scoring report generated.');
     }
@@ -258,19 +276,18 @@ export default function App() {
     setShowSubmitConfirm(true);
   };
 
-  // Hard deadline: at 6 PM IST auto-submit candidate work and lock further testing
+  // Auto-submit when the candidate's access token expires
   useEffect(() => {
-    if (!RESTRICTED_ACCESS) return;
-
     const tick = () => {
-      if (isAccessWindowOpen()) return;
       const snap = sessionRef.current;
-      if (snap.isLoggedIn && snap.userRole === 'candidate' && !snap.testCompleted) {
-        handleEndTest('access_deadline');
+      if (!snap.isLoggedIn || snap.userRole !== 'candidate' || snap.testCompleted) return;
+      const exp = snap.tokenSession?.exp;
+      if (!exp) return;
+      if (Date.now() >= exp) {
+        handleEndTest('token_expired');
       }
     };
 
-    tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, [handleEndTest]);
@@ -289,6 +306,7 @@ export default function App() {
     setStudentEmailInput('');
     setAccessTokenInput('');
     setCandidateLoginError('');
+    setCandidateStep('details');
     setAdminPinInput('');
     setAdminPinError(false);
     setActiveTab('shop');
@@ -296,6 +314,7 @@ export default function App() {
     setShowSubmitConfirm(false);
     setCandidateEmail('');
     setAccessExpiredNotice(false);
+    setTokenSession(null);
   };
 
   // Role-safe mode change: candidates cannot open interviewer panel
@@ -343,21 +362,16 @@ export default function App() {
             <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
               <span className="badge badge-brand">4 Sandbox Apps</span>
               <span className="badge badge-medium">{MASTER_BUGS.length} Injected Defects</span>
-              {RESTRICTED_ACCESS ? (
-                <span className="badge badge-critical">Invite-only candidate</span>
-              ) : (
-                <span className="badge badge-low">Live Scoring</span>
-              )}
+              <span className="badge badge-low">Token-gated access</span>
             </div>
           </div>
 
           {/* Auth card */}
           <div className="w-full max-w-lg glass-panel-glow rounded-2xl p-1 animate-scale-in">
-            {/* Segmented control — admin always available */}
             <div className="nav-track m-3 mb-0">
               <button
                 type="button"
-                onClick={() => setLoginTab('candidate')}
+                onClick={() => { setLoginTab('candidate'); setCandidateLoginError(''); }}
                 className={`nav-pill flex-1 justify-center ${loginTab === 'candidate' ? 'active' : ''}`}
               >
                 <User className="w-3.5 h-3.5" /> Candidate
@@ -374,76 +388,79 @@ export default function App() {
             <div className="p-6 space-y-5">
               {loginTab === 'candidate' ? (
                 <>
-                  <div>
-                    <h2 className="text-lg font-bold text-primary">Invited Candidate Access</h2>
-                    <p className="text-xs text-secondary mt-0.5">
-                      Enter your name, authorized email, and access token to begin.
-                    </p>
-                  </div>
-
-                  {RESTRICTED_ACCESS && !isAccessWindowOpen() ? (
-                    <div className="alert alert-error">
-                      <Lock className="w-4 h-4 shrink-0" />
-                      <span>
-                        Candidate access is closed. The deadline was <strong>6:00 PM IST</strong> ({formatAccessDeadline()}).
-                        Contact your interviewer if you need support.
-                      </span>
-                    </div>
-                  ) : (
-                    <form onSubmit={handleStudentLogin} className="space-y-4">
-                      {candidateLoginError && (
-                        <div className="alert alert-error">
-                          <AlertTriangle className="w-4 h-4 shrink-0" />
-                          <span>{candidateLoginError}</span>
-                        </div>
-                      )}
-
-                      {RESTRICTED_ACCESS && (
-                        <div className="alert alert-warn text-[11px]">
-                          <Clock className="w-4 h-4 shrink-0 mt-0.5" />
-                          <span>
-                            Invite-only session. Deadline: <strong className="text-primary">6:00 PM IST today</strong>
-                            {' '}({formatAccessDeadline()}). At the deadline, unfinished work is auto-submitted.
-                          </span>
-                        </div>
-                      )}
-
+                  {candidateStep === 'details' ? (
+                    <>
                       <div>
-                        <label className="block text-xs font-semibold text-secondary mb-1.5">Full Name</label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="Your full name"
-                          value={studentNameInput}
-                          onChange={(e) => setStudentNameInput(e.target.value)}
-                          className="glass-input"
-                          autoComplete="name"
-                        />
+                        <h2 className="text-lg font-bold text-primary">Start Assessment</h2>
+                        <p className="text-xs text-secondary mt-0.5">
+                          Enter your details. You will be asked for an access token next.
+                        </p>
                       </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-secondary mb-1.5">Email Address</label>
-                        <input
-                          type="email"
-                          required
-                          placeholder={RESTRICTED_ACCESS ? INVITED_EMAIL : 'you@example.com'}
-                          value={studentEmailInput}
-                          onChange={(e) => {
-                            setStudentEmailInput(e.target.value);
-                            setCandidateLoginError('');
-                          }}
-                          className="glass-input font-mono"
-                          autoComplete="email"
-                        />
-                      </div>
-                      {RESTRICTED_ACCESS && (
+
+                      <form onSubmit={handleCandidateDetailsContinue} className="space-y-4">
                         <div>
-                          <label className="block text-xs font-semibold text-secondary mb-1.5 flex items-center gap-1.5">
-                            <KeyRound className="w-3.5 h-3.5" /> Access Token
-                          </label>
+                          <label className="block text-xs font-semibold text-secondary mb-1.5">Full Name</label>
                           <input
                             type="text"
                             required
-                            placeholder="Paste the token shared with you"
+                            placeholder="Your full name"
+                            value={studentNameInput}
+                            onChange={(e) => setStudentNameInput(e.target.value)}
+                            className="glass-input"
+                            autoComplete="name"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-secondary mb-1.5">Email Address</label>
+                          <input
+                            type="email"
+                            required
+                            placeholder="you@example.com"
+                            value={studentEmailInput}
+                            onChange={(e) => setStudentEmailInput(e.target.value)}
+                            className="glass-input font-mono"
+                            autoComplete="email"
+                          />
+                        </div>
+
+                        <div className="alert alert-info">
+                          <Sparkles className="w-4 h-4 shrink-0 mt-0.5" />
+                          <span>
+                            You need a valid access token from your interviewer. Tokens last <strong>4 hours</strong> from generation.
+                          </span>
+                        </div>
+
+                        <button type="submit" className="btn btn-success w-full py-3 text-sm">
+                          Continue — Enter Token <ArrowRight className="w-4 h-4" />
+                        </button>
+                      </form>
+                    </>
+                  ) : (
+                    <>
+                      <div>
+                        <h2 className="text-lg font-bold text-primary flex items-center gap-2">
+                          <KeyRound className="w-5 h-5 text-violet-400" /> Enter Access Token
+                        </h2>
+                        <p className="text-xs text-secondary mt-0.5">
+                          Paste the token shared by your interviewer for{' '}
+                          <strong className="text-primary font-mono">{studentEmailInput}</strong>.
+                        </p>
+                      </div>
+
+                      <form onSubmit={handleCandidateTokenSubmit} className="space-y-4">
+                        {candidateLoginError && (
+                          <div className="alert alert-error">
+                            <AlertTriangle className="w-4 h-4 shrink-0" />
+                            <span>{candidateLoginError}</span>
+                          </div>
+                        )}
+
+                        <div>
+                          <label className="block text-xs font-semibold text-secondary mb-1.5">Access Token</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="BHQ.••••••••.••••••••"
                             value={accessTokenInput}
                             onChange={(e) => {
                               setAccessTokenInput(e.target.value);
@@ -452,21 +469,31 @@ export default function App() {
                             className="glass-input font-mono text-sm"
                             autoComplete="off"
                             spellCheck={false}
+                            autoFocus
                           />
                         </div>
-                      )}
 
-                      <div className="alert alert-info">
-                        <Sparkles className="w-4 h-4 shrink-0 mt-0.5" />
-                        <span>
-                          After login you will read full instructions. The session clock starts only when you click Start Test.
-                        </span>
-                      </div>
+                        <div className="alert alert-warn text-[11px]">
+                          <Clock className="w-4 h-4 shrink-0 mt-0.5" />
+                          <span>
+                            When the token expires (4 hours after it was generated), the test auto-submits and access closes.
+                          </span>
+                        </div>
 
-                      <button type="submit" className="btn btn-success w-full py-3 text-sm">
-                        Continue to Instructions <ArrowRight className="w-4 h-4" />
-                      </button>
-                    </form>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => { setCandidateStep('details'); setCandidateLoginError(''); }}
+                            className="btn btn-ghost flex-1"
+                          >
+                            Back
+                          </button>
+                          <button type="submit" className="btn btn-success flex-[2] py-3 text-sm">
+                            Validate &amp; Continue <ArrowRight className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </form>
+                    </>
                   )}
                 </>
               ) : (
@@ -474,7 +501,7 @@ export default function App() {
                   <div>
                     <h2 className="text-lg font-bold text-primary">Interviewer Access</h2>
                     <p className="text-xs text-secondary mt-0.5">
-                      Admin access remains open. Unlock bug controls, reports library, and scoring.
+                      Generate candidate tokens, review reports, and control sandbox bugs.
                     </p>
                   </div>
 
@@ -503,9 +530,9 @@ export default function App() {
 
                     <div className="surface-muted rounded-xl p-3.5 space-y-1.5 text-[11px] text-secondary leading-relaxed">
                       <p className="font-semibold text-primary text-xs">What you get</p>
-                      <p>• Reproduce steps for all {MASTER_BUGS.length} intentional defects</p>
-                      <p>• Inject or disable bugs before a candidate starts</p>
+                      <p>• Generate 4-hour access tokens for any candidate</p>
                       <p>• Review saved candidate reports and scorecards</p>
+                      <p>• Inject or disable intentional bugs in sandboxes</p>
                     </div>
 
                     <button type="submit" className="btn btn-violet w-full py-3 text-sm">
@@ -549,8 +576,8 @@ export default function App() {
             {[
               {
                 icon: Clock,
-                label: 'Deadline',
-                value: RESTRICTED_ACCESS ? 'Today 6:00 PM IST' : '30 Minutes',
+                label: 'Access ends',
+                value: tokenSession?.exp ? formatExpiry(tokenSession.exp) : 'Token window',
                 color: 'text-amber-400'
               },
               { icon: Bug, label: 'Sandboxes', value: '4 Live Apps', color: 'text-rose-400' },
@@ -764,19 +791,11 @@ export default function App() {
             <div className="alert alert-warn">
               <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
               <span className="text-[11px] md:text-xs leading-relaxed">
-                <strong>Hard deadline:</strong>{' '}
-                {RESTRICTED_ACCESS ? (
-                  <>
-                    You may report bugs until <strong>6:00 PM IST today</strong> ({formatAccessDeadline()}).
-                    When the deadline hits, the platform <strong>auto-submits</strong> whatever defects and quiz answers you have and
-                    blocks further access. You can also submit earlier via <strong>Submit Test</strong>.
-                  </>
-                ) : (
-                  <>
-                    After you start, the clock runs continuously. At 00:00 the platform auto-submits and scores whatever you completed.
-                  </>
-                )}
-                {' '}Work methodically — quality reports on important bugs beat rushing many weak ones.
+                <strong>Token deadline:</strong>{' '}
+                Your access token is valid for <strong>4 hours from when the interviewer generated it</strong>
+                {tokenSession?.exp ? <> (expires <strong>{formatExpiry(tokenSession.exp)}</strong>)</> : null}.
+                When it expires, the platform <strong>auto-submits</strong> whatever defects and quiz answers you have.
+                You can also submit earlier via <strong>Submit Test</strong>. Work methodically — quality reports on important bugs beat rushing many weak ones.
               </span>
             </div>
           </div>
@@ -835,7 +854,7 @@ export default function App() {
               <h2 className="text-xl font-bold text-primary">Assessment Submitted</h2>
               <p className="text-sm text-secondary mt-2 leading-relaxed">
                 {accessExpiredNotice
-                  ? 'Access deadline (6:00 PM IST) was reached. Your work was auto-submitted and candidate access is now locked.'
+                  ? 'Your access token expired. Your work was auto-submitted and this session is locked.'
                   : 'Your session has closed. Review your report card below, or sign out when finished.'}
               </p>
             </div>

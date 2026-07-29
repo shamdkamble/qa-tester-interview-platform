@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import {
-  Key, Power, Award, Sliders, Trash2, FileText, Bug, LogOut, CheckCircle2, Library
+  Key, Power, Award, Sliders, Trash2, FileText, Bug, LogOut, CheckCircle2, Library, KeyRound
 } from 'lucide-react';
 import ScorecardModal from './ScorecardModal';
 import AdminReports from './AdminReports';
+import AdminTokenManager from './AdminTokenManager';
 import { loadSubmissions } from '../utils/submissionsStore';
 import { ADMIN_PIN } from '../config/auth';
 
@@ -24,7 +25,7 @@ export default function InterviewerDashboard({
   const [pinError, setPinError] = useState(false);
   const [showScorecard, setShowScorecard] = useState(false);
   const [filterApp, setFilterApp] = useState('all');
-  const [dashTab, setDashTab] = useState('reports'); // default to reports so admin sees library first
+  const [dashTab, setDashTab] = useState('tokens'); // tokens first for issuing access
   const [savedCount, setSavedCount] = useState(() => loadSubmissions().length);
 
   const handlePinSubmit = (e) => {
@@ -134,6 +135,14 @@ export default function InterviewerDashboard({
       <div className="nav-track w-full sm:w-auto">
         <button
           type="button"
+          onClick={() => setDashTab('tokens')}
+          className={`nav-pill ${dashTab === 'tokens' ? 'active' : ''}`}
+        >
+          <KeyRound className="w-3.5 h-3.5" />
+          Access Tokens
+        </button>
+        <button
+          type="button"
           onClick={() => {
             setDashTab('reports');
             setSavedCount(loadSubmissions().length);
@@ -156,7 +165,9 @@ export default function InterviewerDashboard({
         </button>
       </div>
 
-      {dashTab === 'reports' ? (
+      {dashTab === 'tokens' ? (
+        <AdminTokenManager />
+      ) : dashTab === 'reports' ? (
         <AdminReports onRefreshNeeded={() => setSavedCount(loadSubmissions().length)} />
       ) : (
         <>
