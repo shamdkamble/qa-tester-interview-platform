@@ -15,7 +15,7 @@ import { computeAssessmentScore } from './utils/scoring';
 import { addSubmission } from './utils/submissionsStore';
 import {
   User, Shield, HelpCircle, ArrowRight, Play, CheckCircle, Clock,
-  AlertTriangle, Bug, Sun, Moon, Sparkles, Target, BookOpen, LogOut,
+  AlertTriangle, Bug, Sun, Moon, Sparkles, BookOpen, LogOut,
   ListChecks, Award, FileWarning, Terminal
 } from 'lucide-react';
 
