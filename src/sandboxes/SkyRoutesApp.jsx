@@ -1,50 +1,44 @@
 import React, { useState } from 'react';
-import { Plane, Calendar, Users, DollarSign, ArrowRight, CheckCircle2, AlertTriangle, ArrowLeftRight } from 'lucide-react';
+import { Plane, Calendar, Users, ArrowRight, AlertTriangle, ArrowLeftRight } from 'lucide-react';
 
 export default function SkyRoutesApp({ activeBugs, addLog }) {
   const [departureCity, setDepartureCity] = useState('New York (JFK)');
   const [destinationCity, setDestinationCity] = useState('London (LHR)');
   const [departDate, setDepartDate] = useState('2026-08-25');
-  const [returnDate, setReturnDate] = useState('2026-08-15'); // Pre-set to earlier date to test candidate detection
-  const [adults, setAdults] = useState(0); // Pre-set to 0 to test boundary value analysis
+  const [returnDate, setReturnDate] = useState('2026-08-15');
+  const [adults, setAdults] = useState(0);
   const [currency, setCurrency] = useState('USD');
   const [basePriceUSD, setBasePriceUSD] = useState(500);
-
   const [searchSubmitted, setSearchSubmitted] = useState(false);
   const [dateError, setDateError] = useState('');
 
-  // Currency Switch Logic
   const handleCurrencyToggle = () => {
     const bugCurrencyDouble = activeBugs.includes('sky_currency_double');
-    
+
     if (currency === 'USD') {
       setCurrency('EUR');
-      setBasePriceUSD(prev => prev * 0.90); // $500 -> €450
+      setBasePriceUSD(prev => prev * 0.90);
       addLog('network', 'SkyRoutes Currency', 'Switched display currency to EUR (€)');
     } else {
       setCurrency('USD');
       if (bugCurrencyDouble) {
-        // BUG: multiplies by 1.23 instead of reverting cleanly, inflating price to $555!
         setBasePriceUSD(prev => prev * 1.23);
         addLog('warn', 'SkyRoutes Currency Bug', 'Currency toggled back to USD, but base price inflated due to double rate application.');
       } else {
-        setBasePriceUSD(500); // Fixed base USD price reset
+        setBasePriceUSD(500);
       }
     }
   };
 
-  // Search Flight submit
   const handleSearch = (e) => {
     e.preventDefault();
     setDateError('');
 
     const bugReturnDate = activeBugs.includes('sky_return_date');
     const bugPassengerZero = activeBugs.includes('sky_passenger_zero');
-
     const dep = new Date(departDate);
     const ret = new Date(returnDate);
 
-    // 1. Date Logic
     if (!bugReturnDate && ret < dep) {
       setDateError('Invalid Date Selection: Return date cannot be earlier than departure date.');
       addLog('error', 'SkyRoutes Date Validation', `Rejected return date (${returnDate}) prior to departure date (${departDate}).`);
@@ -53,7 +47,6 @@ export default function SkyRoutesApp({ activeBugs, addLog }) {
       addLog('warn', 'SkyRoutes Logic Flaw', `Accepted return date (${returnDate}) before departure date (${departDate}).`);
     }
 
-    // 2. Passenger count check
     if (!bugPassengerZero && adults < 1) {
       setDateError('Invalid Passenger Count: Minimum 1 Adult passenger required.');
       addLog('error', 'SkyRoutes Passenger Validation', 'Rejected flight search with 0 passengers.');
@@ -69,57 +62,45 @@ export default function SkyRoutesApp({ activeBugs, addLog }) {
   const currencySymbol = currency === 'USD' ? '$' : '€';
 
   return (
-    <div className="space-y-6">
-      {/* App Nav Bar */}
-      <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+    <div className="space-y-6 animate-fade-in">
+      <div className="app-chrome">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-600 to-blue-500 flex items-center justify-center text-white shadow-lg shadow-cyan-500/20">
+          <div className="app-icon bg-gradient-to-br from-cyan-600 to-blue-500">
             <Plane className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-slate-100 flex items-center gap-2">
+            <h2 className="text-xl font-bold text-primary flex flex-wrap items-center gap-2">
               SkyRoutes Flight Search
-              <span className="text-xs px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
-                Travel Booking Sandbox
-              </span>
+              <span className="badge badge-medium">Travel Booking</span>
             </h2>
-            <p className="text-xs text-slate-400">Test date sequence logic, currency conversion math, and 0-passenger boundary cases</p>
+            <p className="text-xs text-secondary">Date order · currency math · zero-passenger boundary</p>
           </div>
         </div>
 
-        <button
-          onClick={handleCurrencyToggle}
-          className="px-3.5 py-1.5 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 text-xs font-mono text-cyan-300 flex items-center gap-2 transition"
-        >
+        <button type="button" onClick={handleCurrencyToggle} className="btn btn-ghost font-mono text-cyan-300">
           <ArrowLeftRight className="w-3.5 h-3.5" />
-          Currency: <span className="font-bold text-white">{currency} ({currencySymbol})</span>
+          {currency} ({currencySymbol})
         </button>
       </div>
 
-      {/* Main Search Panel */}
-      <div className="max-w-3xl mx-auto glass-panel p-6 rounded-2xl space-y-6">
+      <div className="max-w-3xl mx-auto glass-panel p-6 rounded-2xl space-y-5">
         <div className="flex items-center justify-between">
-          <h3 className="text-base font-bold text-slate-100">Search Round-Trip Flights</h3>
-          <span className="text-xs text-slate-400 font-mono">Base Rate: {currencySymbol}{basePriceUSD.toFixed(2)}</span>
+          <h3 className="text-base font-bold text-primary">Search Round-Trip Flights</h3>
+          <span className="text-xs text-muted font-mono">Base: {currencySymbol}{basePriceUSD.toFixed(2)}</span>
         </div>
 
         {dateError && (
-          <div className="p-3 bg-rose-950/60 border border-rose-800 rounded-xl text-xs text-rose-300 flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+          <div className="alert alert-error">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
             <span>{dateError}</span>
           </div>
         )}
 
-        <form onSubmit={handleSearch} className="space-y-4 text-xs">
-          {/* Origin & Destination */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <form onSubmit={handleSearch} className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-slate-300 mb-1 font-medium">Departure City</label>
-              <select
-                value={departureCity}
-                onChange={(e) => setDepartureCity(e.target.value)}
-                className="w-full p-2.5 glass-input rounded-lg bg-slate-900 text-slate-200"
-              >
+              <label className="block text-xs font-semibold text-secondary mb-1.5">Departure City</label>
+              <select value={departureCity} onChange={(e) => setDepartureCity(e.target.value)} className="glass-input">
                 <option>New York (JFK)</option>
                 <option>San Francisco (SFO)</option>
                 <option>Tokyo (HND)</option>
@@ -127,12 +108,8 @@ export default function SkyRoutesApp({ activeBugs, addLog }) {
               </select>
             </div>
             <div>
-              <label className="block text-slate-300 mb-1 font-medium">Destination City</label>
-              <select
-                value={destinationCity}
-                onChange={(e) => setDestinationCity(e.target.value)}
-                className="w-full p-2.5 glass-input rounded-lg bg-slate-900 text-slate-200"
-              >
+              <label className="block text-xs font-semibold text-secondary mb-1.5">Destination City</label>
+              <select value={destinationCity} onChange={(e) => setDestinationCity(e.target.value)} className="glass-input">
                 <option>London (LHR)</option>
                 <option>Paris (CDG)</option>
                 <option>Dubai (DXB)</option>
@@ -141,10 +118,9 @@ export default function SkyRoutesApp({ activeBugs, addLog }) {
             </div>
           </div>
 
-          {/* Dates */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-slate-300 mb-1 font-medium flex items-center gap-1">
+              <label className="block text-xs font-semibold text-secondary mb-1.5 flex items-center gap-1">
                 <Calendar className="w-3.5 h-3.5 text-cyan-400" /> Departure Date
               </label>
               <input
@@ -154,11 +130,11 @@ export default function SkyRoutesApp({ activeBugs, addLog }) {
                 onChange={(e) => setDepartDate(e.target.value)}
                 onClick={(e) => e.target.showPicker && e.target.showPicker()}
                 onFocus={(e) => e.target.showPicker && e.target.showPicker()}
-                className="w-full p-2.5 glass-input rounded-lg text-slate-200 cursor-pointer"
+                className="glass-input cursor-pointer"
               />
             </div>
             <div>
-              <label className="block text-slate-300 mb-1 font-medium flex items-center gap-1">
+              <label className="block text-xs font-semibold text-secondary mb-1.5 flex items-center gap-1">
                 <Calendar className="w-3.5 h-3.5 text-amber-400" /> Return Date
               </label>
               <input
@@ -168,73 +144,66 @@ export default function SkyRoutesApp({ activeBugs, addLog }) {
                 onChange={(e) => setReturnDate(e.target.value)}
                 onClick={(e) => e.target.showPicker && e.target.showPicker()}
                 onFocus={(e) => e.target.showPicker && e.target.showPicker()}
-                className="w-full p-2.5 glass-input rounded-lg text-slate-200 cursor-pointer"
+                className="glass-input cursor-pointer"
               />
-              <p className="text-[10px] text-slate-500 mt-1">Compare return date with departure date</p>
+              <p className="text-[10px] text-muted mt-1">Compare return date with departure</p>
             </div>
           </div>
 
-          {/* Passengers */}
-          <div className="p-4 bg-slate-900/60 border border-slate-800 rounded-xl flex items-center justify-between">
-            <div className="flex items-center gap-2">
+          <div className="surface-muted rounded-xl p-4 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2.5">
               <Users className="w-4 h-4 text-indigo-400" />
               <div>
-                <span className="text-slate-200 font-bold block">Adult Passengers</span>
-                <span className="text-[10px] text-slate-400">Min 1 required for valid fare calculation</span>
+                <span className="text-sm font-bold text-primary block">Adult Passengers</span>
+                <span className="text-[10px] text-muted">Min 1 required for valid fare</span>
               </div>
             </div>
-
             <div className="flex items-center gap-3">
               <button
                 type="button"
                 onClick={() => setAdults(prev => Math.max(0, prev - 1))}
-                className="w-7 h-7 bg-slate-800 hover:bg-slate-700 rounded text-slate-200 flex items-center justify-center font-bold"
+                className="w-8 h-8 rounded-lg bg-[var(--bg-hover)] hover:bg-indigo-600 hover:text-white text-primary flex items-center justify-center font-bold transition"
               >
-                -
+                −
               </button>
-              <span className="font-mono text-sm font-bold text-cyan-300 px-2">{adults}</span>
+              <span className="font-mono text-sm font-bold text-cyan-400 w-6 text-center">{adults}</span>
               <button
                 type="button"
                 onClick={() => setAdults(prev => prev + 1)}
-                className="w-7 h-7 bg-slate-800 hover:bg-slate-700 rounded text-slate-200 flex items-center justify-center font-bold"
+                className="w-8 h-8 rounded-lg bg-[var(--bg-hover)] hover:bg-indigo-600 hover:text-white text-primary flex items-center justify-center font-bold transition"
               >
                 +
               </button>
             </div>
           </div>
 
-          <button
-            type="submit"
-            className="w-full py-3 bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white font-bold rounded-xl shadow-lg transition flex items-center justify-center gap-2"
-          >
+          <button type="submit" className="btn w-full py-3 text-sm text-white bg-gradient-to-r from-cyan-600 to-indigo-600 hover:brightness-110 shadow-lg shadow-cyan-500/20">
             Search Available Flights <ArrowRight className="w-4 h-4" />
           </button>
         </form>
 
-        {/* Results */}
         {searchSubmitted && (
-          <div className="pt-4 border-t border-slate-800 space-y-4">
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Available Flight Results</h4>
-            
-            <div className="p-4 bg-slate-900/80 border border-cyan-500/30 rounded-xl flex items-center justify-between">
+          <div className="pt-4 border-t border-[var(--border)] space-y-3 animate-fade-in">
+            <h4 className="section-label">Available Results</h4>
+            <div className="surface-muted rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-cyan-500/20">
               <div className="space-y-1">
-                <div className="flex items-center gap-2 text-sm font-bold text-white">
+                <div className="flex items-center gap-2 text-sm font-bold text-primary">
                   <span>{departureCity}</span>
                   <Plane className="w-4 h-4 text-cyan-400" />
                   <span>{destinationCity}</span>
                 </div>
-                <div className="text-xs text-slate-400 font-mono">
-                  {departDate} to {returnDate} • {adults} {adults === 1 ? 'Passenger' : 'Passengers'}
+                <div className="text-xs text-muted font-mono">
+                  {departDate} → {returnDate} · {adults} {adults === 1 ? 'Passenger' : 'Passengers'}
                 </div>
               </div>
-
               <div className="text-right">
-                <div className="text-lg font-mono font-extrabold text-cyan-300">
+                <div className="text-lg font-mono font-extrabold text-cyan-400">
                   {currencySymbol}{(basePriceUSD * adults).toFixed(2)}
                 </div>
                 <button
+                  type="button"
                   onClick={() => addLog('network', 'SkyRoutes Flight', 'Flight ticket booked!')}
-                  className="px-3 py-1 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold rounded mt-1"
+                  className="btn mt-1.5 px-3 py-1 text-[11px] text-white bg-cyan-600 hover:bg-cyan-500"
                 >
                   Select Flight
                 </button>

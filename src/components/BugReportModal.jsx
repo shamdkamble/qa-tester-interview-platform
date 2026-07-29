@@ -1,32 +1,45 @@
-import React, { useState } from 'react';
-import { Bug, X, Send, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Bug, X, Send, CheckCircle2 } from 'lucide-react';
 import { MASTER_BUGS } from '../data/masterBugsList';
 
-export default function BugReportModal({ isOpen, onClose, onSubmitBug, currentApp }) {
-  const [bugData, setBugData] = useState({
-    title: '',
-    appId: currentApp || 'shop',
-    bugId: '', // Matches master bug ID or "other"
-    category: 'Functional',
-    severity: 'Medium',
-    stepsToReproduce: '',
-    expectedBehavior: '',
-    actualBehavior: '',
-    candidateNotes: ''
-  });
+const EMPTY_FORM = {
+  title: '',
+  appId: 'shop',
+  bugId: '',
+  category: 'Functional',
+  severity: 'Medium',
+  stepsToReproduce: '',
+  expectedBehavior: '',
+  actualBehavior: '',
+  candidateNotes: ''
+};
 
+export default function BugReportModal({ isOpen, onClose, onSubmitBug, currentApp }) {
+  const [bugData, setBugData] = useState({ ...EMPTY_FORM, appId: currentApp || 'shop' });
   const [submitted, setSubmitted] = useState(false);
+
+  // Sync app when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setBugData(prev => ({
+        ...prev,
+        appId: currentApp && currentApp !== 'quiz' ? currentApp : prev.appId || 'shop',
+        bugId: '',
+        title: prev.title
+      }));
+      setSubmitted(false);
+    }
+  }, [isOpen, currentApp]);
 
   if (!isOpen) return null;
 
-  // Filter master bugs list by the selected application
   const availableBugs = MASTER_BUGS.filter(bug => bug.appId === bugData.appId);
 
   const handleAppChange = (appId) => {
     setBugData(prev => ({
       ...prev,
       appId,
-      bugId: '', // reset bug mapping
+      bugId: '',
       title: '',
       category: 'Functional',
       severity: 'Medium'
@@ -37,8 +50,7 @@ export default function BugReportModal({ isOpen, onClose, onSubmitBug, currentAp
     setBugData(prev => ({
       ...prev,
       bugId,
-      // Keep title, category, severity blank/default so they fill it in manually
-      title: '',
+      title: prev.title,
       category: 'Functional',
       severity: 'Medium'
     }));
@@ -46,10 +58,8 @@ export default function BugReportModal({ isOpen, onClose, onSubmitBug, currentAp
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!bugData.bugId) {
-      alert("Please select a Suspected Bug Area (or select 'Other' for a custom bug)!");
-      return;
-    }
+    if (!bugData.bugId) return;
+
     onSubmitBug({
       ...bugData,
       id: Date.now(),
@@ -59,57 +69,49 @@ export default function BugReportModal({ isOpen, onClose, onSubmitBug, currentAp
     setTimeout(() => {
       setSubmitted(false);
       onClose();
-      setBugData({
-        title: '',
-        appId: currentApp || 'shop',
-        bugId: '',
-        category: 'Functional',
-        severity: 'Medium',
-        stepsToReproduce: '',
-        expectedBehavior: '',
-        actualBehavior: '',
-        candidateNotes: ''
-      });
-    }, 1200);
+      setBugData({ ...EMPTY_FORM, appId: currentApp || 'shop' });
+    }, 1100);
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
-      <div className="w-full max-w-xl glass-panel-glow p-6 rounded-2xl space-y-4 relative border border-indigo-500/30">
-        <button 
+    <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="bug-report-title">
+      <div className="modal-panel max-w-xl glass-panel-glow p-6 space-y-5 relative">
+        <button
+          type="button"
           onClick={onClose}
-          className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+          className="absolute top-4 right-4 btn-icon"
+          aria-label="Close"
         >
-          <X className="w-5 h-5" />
+          <X className="w-4 h-4" />
         </button>
 
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-rose-500/20 text-rose-400 border border-rose-500/30 flex items-center justify-center">
+        <div className="flex items-center gap-3 pr-8">
+          <div className="w-11 h-11 rounded-xl bg-rose-500/15 text-rose-400 border border-rose-500/25 flex items-center justify-center shrink-0">
             <Bug className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="text-lg font-bold text-slate-100">Log QA Defect Report</h3>
-            <p className="text-xs text-slate-400">Describe the bug and link it to a functional feature area</p>
+            <h3 id="bug-report-title" className="text-lg font-bold text-primary">Log Defect Report</h3>
+            <p className="text-xs text-secondary">Describe the issue and map it to a feature area for scoring</p>
           </div>
         </div>
 
         {submitted ? (
-          <div className="py-12 text-center space-y-3">
-            <div className="w-12 h-12 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center mx-auto border border-emerald-500/30">
-              <CheckCircle2 className="w-6 h-6" />
+          <div className="py-14 text-center space-y-3 animate-scale-in">
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 flex items-center justify-center">
+              <CheckCircle2 className="w-7 h-7" />
             </div>
-            <h4 className="text-base font-bold text-slate-100">Bug Report Logged Successfully!</h4>
-            <p className="text-xs text-slate-400">Your defect has been saved and will be automatically scored.</p>
+            <h4 className="text-base font-bold text-primary">Defect Logged</h4>
+            <p className="text-xs text-secondary">Saved and queued for automatic scoring.</p>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-slate-300 mb-1 font-semibold">Affected Application *</label>
+                <label className="block text-xs font-semibold text-secondary mb-1.5">Affected Application *</label>
                 <select
                   value={bugData.appId}
                   onChange={(e) => handleAppChange(e.target.value)}
-                  className="w-full p-2.5 glass-input rounded-lg bg-slate-900 text-slate-200"
+                  className="glass-input"
                 >
                   <option value="shop">ShopSphere Store</option>
                   <option value="desk">DeskFlow User Portal</option>
@@ -117,20 +119,17 @@ export default function BugReportModal({ isOpen, onClose, onSubmitBug, currentAp
                   <option value="task">TaskFlow Messaging Sandbox</option>
                 </select>
               </div>
-
               <div>
-                <label className="block text-slate-300 mb-1 font-semibold">Suspected Feature Area *</label>
+                <label className="block text-xs font-semibold text-secondary mb-1.5">Suspected Feature Area *</label>
                 <select
                   value={bugData.bugId}
                   onChange={(e) => handleBugSelection(e.target.value)}
                   required
-                  className="w-full p-2.5 glass-input rounded-lg bg-slate-900 text-slate-200"
+                  className="glass-input"
                 >
-                  <option value="">-- Choose Feature Area --</option>
+                  <option value="">— Choose feature area —</option>
                   {availableBugs.map(bug => (
-                    <option key={bug.id} value={bug.id}>
-                      {bug.featureArea}
-                    </option>
+                    <option key={bug.id} value={bug.id}>{bug.featureArea}</option>
                   ))}
                   <option value="other">Other / Custom Component</option>
                 </select>
@@ -138,24 +137,24 @@ export default function BugReportModal({ isOpen, onClose, onSubmitBug, currentAp
             </div>
 
             <div>
-              <label className="block text-slate-300 mb-1 font-semibold">Defect Title / Summary *</label>
+              <label className="block text-xs font-semibold text-secondary mb-1.5">Defect Title / Summary *</label>
               <input
                 type="text"
                 required
-                placeholder="Describe the defect summary in your own words..."
+                placeholder="Summarize the defect in your own words…"
                 value={bugData.title}
                 onChange={(e) => setBugData({ ...bugData, title: e.target.value })}
-                className="w-full p-2.5 glass-input rounded-lg"
+                className="glass-input"
               />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-slate-300 mb-1 font-semibold">Category *</label>
+                <label className="block text-xs font-semibold text-secondary mb-1.5">Category *</label>
                 <select
                   value={bugData.category}
                   onChange={(e) => setBugData({ ...bugData, category: e.target.value })}
-                  className="w-full p-2.5 glass-input rounded-lg bg-slate-900 text-slate-200"
+                  className="glass-input"
                 >
                   <option>Functional</option>
                   <option>Boundary Value Analysis</option>
@@ -164,13 +163,12 @@ export default function BugReportModal({ isOpen, onClose, onSubmitBug, currentAp
                   <option>Security / Sanitization</option>
                 </select>
               </div>
-
               <div>
-                <label className="block text-slate-300 mb-1 font-semibold">Severity Level *</label>
+                <label className="block text-xs font-semibold text-secondary mb-1.5">Severity *</label>
                 <select
                   value={bugData.severity}
                   onChange={(e) => setBugData({ ...bugData, severity: e.target.value })}
-                  className="w-full p-2.5 glass-input rounded-lg bg-slate-900 text-slate-200"
+                  className="glass-input"
                 >
                   <option>Low</option>
                   <option>Medium</option>
@@ -181,56 +179,48 @@ export default function BugReportModal({ isOpen, onClose, onSubmitBug, currentAp
             </div>
 
             <div>
-              <label className="block text-slate-300 mb-1 font-semibold">Exact Steps to Reproduce *</label>
+              <label className="block text-xs font-semibold text-secondary mb-1.5">Steps to Reproduce *</label>
               <textarea
                 required
                 rows={3}
-                placeholder="1. Open app&#10;2. Interact with component&#10;3. Observe the behavior"
+                placeholder={"1. Open app\n2. Interact with component\n3. Observe the behavior"}
                 value={bugData.stepsToReproduce}
                 onChange={(e) => setBugData({ ...bugData, stepsToReproduce: e.target.value })}
-                className="w-full p-2.5 glass-input rounded-lg font-mono"
+                className="glass-input font-mono"
               />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-slate-300 mb-1 font-semibold">Expected Behavior *</label>
+                <label className="block text-xs font-semibold text-secondary mb-1.5">Expected Behavior *</label>
                 <textarea
                   required
                   rows={2}
-                  placeholder="What the application should do..."
+                  placeholder="What should happen…"
                   value={bugData.expectedBehavior}
                   onChange={(e) => setBugData({ ...bugData, expectedBehavior: e.target.value })}
-                  className="w-full p-2.5 glass-input rounded-lg"
+                  className="glass-input"
                 />
               </div>
-
               <div>
-                <label className="block text-slate-300 mb-1 font-semibold">Actual Behavior Observed *</label>
+                <label className="block text-xs font-semibold text-secondary mb-1.5">Actual Behavior *</label>
                 <textarea
                   required
                   rows={2}
-                  placeholder="What the application actually did..."
+                  placeholder="What actually happened…"
                   value={bugData.actualBehavior}
                   onChange={(e) => setBugData({ ...bugData, actualBehavior: e.target.value })}
-                  className="w-full p-2.5 glass-input rounded-lg text-rose-200"
+                  className="glass-input"
                 />
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 pt-2">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-medium"
-              >
+            <div className="flex justify-end gap-2 pt-1">
+              <button type="button" onClick={onClose} className="btn btn-ghost">
                 Cancel
               </button>
-              <button
-                type="submit"
-                className="px-6 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl shadow-lg transition flex items-center gap-2"
-              >
-                <Send className="w-4 h-4" /> Submit Defect Report
+              <button type="submit" className="btn btn-danger px-5">
+                <Send className="w-3.5 h-3.5" /> Submit Defect
               </button>
             </div>
           </form>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Header from './components/Header';
 import ShopSphereApp from './sandboxes/ShopSphereApp';
 import DeskFlowApp from './sandboxes/DeskFlowApp';
@@ -10,65 +10,83 @@ import BugReportModal from './components/BugReportModal';
 import ConsoleSimulator from './components/ConsoleSimulator';
 import ScorecardModal from './components/ScorecardModal';
 import { MASTER_BUGS } from './data/masterBugsList';
-import { User, Shield, HelpCircle, ArrowRight, Play, CheckCircle, Clock, AlertTriangle, Bug } from 'lucide-react';
+import {
+  User, Shield, HelpCircle, ArrowRight, Play, CheckCircle, Clock,
+  AlertTriangle, Bug, Sun, Moon, Sparkles, Target, BookOpen, LogOut
+} from 'lucide-react';
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userRole, setUserRole] = useState(null); // 'candidate' | 'admin'
   const [mode, setMode] = useState('candidate'); // 'candidate' | 'interviewer'
-  const [activeTab, setActiveTab] = useState('shop'); // 'shop' | 'desk' | 'sky' | 'quiz'
+  const [activeTab, setActiveTab] = useState('shop');
 
-  // Theme state
-  const [theme, setTheme] = useState('dark');
+  // Theme
+  const [theme, setTheme] = useState(() => {
+    if (typeof document !== 'undefined') {
+      return document.documentElement.classList.contains('light') ? 'light' : 'dark';
+    }
+    return 'dark';
+  });
 
-  const toggleTheme = () => {
-    setTheme(prev => {
-      const nextTheme = prev === 'dark' ? 'light' : 'dark';
-      if (nextTheme === 'light') {
-        document.documentElement.classList.add('light');
-        document.documentElement.classList.remove('dark');
-      } else {
-        document.documentElement.classList.add('dark');
-        document.documentElement.classList.remove('light');
-      }
-      return nextTheme;
-    });
-  };
+  useEffect(() => {
+    if (theme === 'light') {
+      document.documentElement.classList.add('light');
+      document.documentElement.classList.remove('dark');
+    } else {
+      document.documentElement.classList.add('dark');
+      document.documentElement.classList.remove('light');
+    }
+  }, [theme]);
 
-  // Instructions screen state for candidate
+  const toggleTheme = () => setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
+
+  // Instructions
   const [showInstructions, setShowInstructions] = useState(false);
 
-  // Timer states
-  const [timeLeft, setTimeLeft] = useState(1800); // 30 minutes (1800s)
+  // Timer
+  const [timeLeft, setTimeLeft] = useState(1800);
   const [timerActive, setTimerActive] = useState(false);
   const [testCompleted, setTestCompleted] = useState(false);
   const [showAutoScorecard, setShowAutoScorecard] = useState(false);
+  const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
 
-  // Login forms state
+  // Login forms
   const [studentNameInput, setStudentNameInput] = useState('');
   const [studentEmailInput, setStudentEmailInput] = useState('');
   const [adminPinInput, setAdminPinInput] = useState('');
   const [adminPinError, setAdminPinError] = useState(false);
+  const [loginTab, setLoginTab] = useState('candidate'); // 'candidate' | 'admin'
 
-  // Master Bugs control state (Interviewer can toggle individual bug IDs)
-  const [activeBugIds, setActiveBugIds] = useState(
-    MASTER_BUGS.map(b => b.id)
-  );
+  // Master bugs
+  const [activeBugIds, setActiveBugIds] = useState(MASTER_BUGS.map(b => b.id));
 
-  // Candidate logged bugs state
+  // Candidate state
   const [candidateBugs, setCandidateBugs] = useState([]);
   const [candidateName, setCandidateName] = useState('QA Fresher Candidate');
+  const [candidateEmail, setCandidateEmail] = useState('');
   const [quizScore, setQuizScore] = useState({ score: 0, total: 8 });
 
-  // Console Logs Simulator State
+  // Console logs
   const [logs, setLogs] = useState([
-    { id: 1, type: 'network', source: 'System', message: 'QA Assessment Environment Initialized. 3 Sandbox Applications Ready.', timestamp: new Date().toLocaleTimeString() },
-    { id: 2, type: 'info', source: 'System', message: 'Master Bug Injection Engine Active (13 intentional bugs available).', timestamp: new Date().toLocaleTimeString() }
+    {
+      id: 1,
+      type: 'network',
+      source: 'System',
+      message: 'QA Assessment Environment Initialized. 4 Sandbox Applications Ready.',
+      timestamp: new Date().toLocaleTimeString()
+    },
+    {
+      id: 2,
+      type: 'info',
+      source: 'System',
+      message: `Master Bug Injection Engine Active (${MASTER_BUGS.length} intentional defects available).`,
+      timestamp: new Date().toLocaleTimeString()
+    }
   ]);
 
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 
-  // Add Log Helper
   const addLog = (type, source, message) => {
     setLogs(prev => [
       {
@@ -82,42 +100,40 @@ export default function App() {
     ]);
   };
 
-  // Toggle bug ON/OFF in Interviewer Dashboard
   const handleToggleBug = (bugId) => {
     setActiveBugIds(prev => {
       const exists = prev.includes(bugId);
       const updated = exists ? prev.filter(id => id !== bugId) : [...prev, bugId];
       const bugObj = MASTER_BUGS.find(b => b.id === bugId);
       addLog(
-        exists ? 'warn' : 'info', 
-        'Bug Control Engine', 
+        exists ? 'warn' : 'info',
+        'Bug Control Engine',
         `Interviewer ${exists ? 'DISABLED' : 'INJECTED'} bug: "${bugObj?.title}"`
       );
       return updated;
     });
   };
 
-  // Handle Candidate Bug Submission
   const handleCandidateBugSubmit = (newBugReport) => {
     setCandidateBugs(prev => [newBugReport, ...prev]);
     addLog('info', 'Candidate Reporter', `New Defect Logged: "${newBugReport.title}" (${newBugReport.severity})`);
   };
 
-  // Login Handlers
   const handleStudentLogin = (e) => {
     e.preventDefault();
     if (!studentNameInput.trim() || !studentEmailInput.trim()) return;
 
-    setCandidateName(studentNameInput);
+    setCandidateName(studentNameInput.trim());
+    setCandidateEmail(studentEmailInput.trim());
     setUserRole('candidate');
     setMode('candidate');
     setIsLoggedIn(true);
-    setShowInstructions(true); // Show instructions page first!
+    setShowInstructions(true);
   };
 
   const handleStartCandidateTest = () => {
     setShowInstructions(false);
-    setTimerActive(true); // Only start timer now!
+    setTimerActive(true);
     addLog('info', 'Assessment System', `Candidate "${candidateName}" acknowledged instructions and started the 30-minute test.`);
   };
 
@@ -134,15 +150,19 @@ export default function App() {
     }
   };
 
-  // Auto-Submit Assessment Handler
   const handleEndTest = () => {
     setTimerActive(false);
     setTestCompleted(true);
     setShowAutoScorecard(true);
+    setShowSubmitConfirm(false);
     addLog('warn', 'Assessment System', 'Assessment session ended. Auto-scoring report generated.');
   };
 
-  // Logout Handler
+  const requestEndTest = () => {
+    if (testCompleted) return;
+    setShowSubmitConfirm(true);
+  };
+
   const handleLogout = () => {
     setIsLoggedIn(false);
     setUserRole(null);
@@ -152,211 +172,273 @@ export default function App() {
     setTimeLeft(1800);
     setTimerActive(false);
     setShowInstructions(false);
+    setQuizScore({ score: 0, total: 8 });
+    setStudentNameInput('');
+    setStudentEmailInput('');
+    setAdminPinInput('');
+    setAdminPinError(false);
+    setActiveTab('shop');
+    setShowAutoScorecard(false);
+    setShowSubmitConfirm(false);
+    setCandidateEmail('');
   };
 
-  // Render Login Screen if not authenticated
+  // Role-safe mode change: candidates cannot open interviewer panel
+  const handleSetMode = (nextMode) => {
+    if (userRole !== 'admin') return;
+    setMode(nextMode);
+  };
+
+  const ThemeToggle = ({ className = '' }) => (
+    <button
+      type="button"
+      onClick={toggleTheme}
+      className={`btn-icon ${className}`}
+      title="Toggle light / dark theme"
+      aria-label="Toggle theme"
+    >
+      {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-indigo-600" />}
+    </button>
+  );
+
+  // ─── Login Screen ───────────────────────────────────────────
   if (!isLoggedIn) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 flex flex-col justify-center items-center p-4">
-        {/* Logo Title */}
-        <div className="text-center space-y-2 mb-8 max-w-lg">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-emerald-500 via-indigo-500 to-violet-600 flex items-center justify-center text-white shadow-xl shadow-indigo-500/20 mx-auto">
-            <Shield className="w-7 h-7" />
-          </div>
-          <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">BugHunt QA Sandbox</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">Interviews & Fresher QA Intern Assessment Suite</p>
+      <div className="app-shell min-h-screen flex flex-col">
+        <div className="absolute top-4 right-4 z-20">
+          <ThemeToggle />
         </div>
 
-        <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* Student Login Portal */}
-          <div className="glass-panel p-6 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-4">
-            <div className="flex items-center gap-3 pb-3 border-b border-slate-200 dark:border-slate-800">
-              <div className="p-2 rounded bg-indigo-500/20 text-indigo-650 dark:text-indigo-400 border border-indigo-500/30">
-                <User className="w-5 h-5" />
-              </div>
-              <div>
-                <h2 className="text-lg font-bold">Student / Candidate</h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Sign in to review guidelines and begin the assessment</p>
+        <div className="flex-1 flex flex-col justify-center items-center px-4 py-10">
+          {/* Brand */}
+          <div className="text-center mb-10 animate-fade-in">
+            <div className="relative mx-auto mb-5 w-16 h-16">
+              <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-emerald-500 via-indigo-500 to-violet-600 blur-xl opacity-50 animate-pulse-glow" />
+              <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500 via-indigo-500 to-violet-600 flex items-center justify-center text-white shadow-2xl">
+                <Shield className="w-8 h-8" strokeWidth={2.2} />
               </div>
             </div>
+            <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-primary">
+              BugHunt <span className="bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">QA</span>
+            </h1>
+            <p className="mt-2 text-sm text-secondary max-w-md mx-auto leading-relaxed">
+              Professional assessment suite for QA interns — hunt intentional defects across live product sandboxes.
+            </p>
 
-            <form onSubmit={handleStudentLogin} className="space-y-4 text-xs">
-              <div>
-                <label className="block text-slate-700 dark:text-slate-300 mb-1 font-medium">Your Full Name</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Alex Rivera"
-                  value={studentNameInput}
-                  onChange={(e) => setStudentNameInput(e.target.value)}
-                  className="w-full p-3 glass-input rounded-xl"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-700 dark:text-slate-300 mb-1 font-medium">Your Email Address</label>
-                <input
-                  type="email"
-                  required
-                  placeholder="alex.rivera@example.com"
-                  value={studentEmailInput}
-                  onChange={(e) => setStudentEmailInput(e.target.value)}
-                  className="w-full p-3 glass-input rounded-xl font-mono"
-                />
-              </div>
-
-              <div className="bg-slate-100 dark:bg-slate-900/60 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed space-y-1">
-                <strong className="text-slate-700 dark:text-slate-300 block">Quick Note:</strong>
-                <p>Logging in will take you to a detailed instruction and guidelines screen before your 30-minute timer starts.</p>
-              </div>
-
-              <button
-                type="submit"
-                className="w-full py-3 bg-gradient-to-r from-emerald-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 text-white font-bold rounded-xl shadow-lg transition flex items-center justify-center gap-2 text-xs"
-              >
-                Continue to Instructions <ArrowRight className="w-4.5 h-4.5" />
-              </button>
-            </form>
+            <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+              <span className="badge badge-brand">4 Sandbox Apps</span>
+              <span className="badge badge-medium">{MASTER_BUGS.length} Injected Defects</span>
+              <span className="badge badge-low">Live Scoring</span>
+            </div>
           </div>
 
-          {/* Admin Login Portal */}
-          <div className="glass-panel p-6 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-4">
-            <div className="flex items-center gap-3 pb-3 border-b border-slate-200 dark:border-slate-800">
-              <div className="p-2 rounded bg-violet-500/20 text-violet-650 dark:text-violet-400 border border-violet-500/30">
-                <Shield className="w-5 h-5" />
-              </div>
-              <div>
-                <h2 className="text-lg font-bold">Interviewer / Admin</h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Unlock the master bug controller & scorecard sheet</p>
-              </div>
+          {/* Auth card */}
+          <div className="w-full max-w-lg glass-panel-glow rounded-2xl p-1 animate-scale-in">
+            {/* Segmented control */}
+            <div className="nav-track m-3 mb-0">
+              <button
+                type="button"
+                onClick={() => setLoginTab('candidate')}
+                className={`nav-pill flex-1 justify-center ${loginTab === 'candidate' ? 'active' : ''}`}
+              >
+                <User className="w-3.5 h-3.5" /> Candidate
+              </button>
+              <button
+                type="button"
+                onClick={() => setLoginTab('admin')}
+                className={`nav-pill flex-1 justify-center ${loginTab === 'admin' ? 'active' : ''}`}
+              >
+                <Shield className="w-3.5 h-3.5" /> Interviewer
+              </button>
             </div>
 
-            <form onSubmit={handleAdminLogin} className="space-y-4 text-xs">
-              {adminPinError && (
-                <div className="p-2.5 bg-rose-100 dark:bg-rose-955 border border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-300 rounded-lg">
-                  Invalid Pin Code. Use the default passcode: <strong className="font-mono text-slate-900 dark:text-white">1234</strong>
-                </div>
+            <div className="p-6 space-y-5">
+              {loginTab === 'candidate' ? (
+                <>
+                  <div>
+                    <h2 className="text-lg font-bold text-primary">Start Assessment</h2>
+                    <p className="text-xs text-secondary mt-0.5">Enter your details to review guidelines and begin.</p>
+                  </div>
+
+                  <form onSubmit={handleStudentLogin} className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-secondary mb-1.5">Full Name</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. Alex Rivera"
+                        value={studentNameInput}
+                        onChange={(e) => setStudentNameInput(e.target.value)}
+                        className="glass-input"
+                        autoComplete="name"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-secondary mb-1.5">Email Address</label>
+                      <input
+                        type="email"
+                        required
+                        placeholder="alex.rivera@example.com"
+                        value={studentEmailInput}
+                        onChange={(e) => setStudentEmailInput(e.target.value)}
+                        className="glass-input font-mono"
+                        autoComplete="email"
+                      />
+                    </div>
+
+                    <div className="alert alert-info">
+                      <Sparkles className="w-4 h-4 shrink-0 mt-0.5" />
+                      <span>You will see full instructions before the 30-minute timer starts. No pressure until you click Start.</span>
+                    </div>
+
+                    <button type="submit" className="btn btn-success w-full py-3 text-sm">
+                      Continue to Instructions <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </form>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <h2 className="text-lg font-bold text-primary">Interviewer Access</h2>
+                    <p className="text-xs text-secondary mt-0.5">Unlock bug controls, session review, and scoring.</p>
+                  </div>
+
+                  <form onSubmit={handleAdminLogin} className="space-y-4">
+                    {adminPinError && (
+                      <div className="alert alert-error">
+                        <AlertTriangle className="w-4 h-4 shrink-0" />
+                        <span>
+                          Invalid PIN. Default passcode: <strong className="font-mono text-primary">1234</strong>
+                        </span>
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="block text-xs font-semibold text-secondary mb-1.5">Access PIN</label>
+                      <input
+                        type="password"
+                        placeholder="Enter PIN (default: 1234)"
+                        value={adminPinInput}
+                        onChange={(e) => {
+                          setAdminPinInput(e.target.value);
+                          setAdminPinError(false);
+                        }}
+                        className="glass-input tracking-[0.35em] text-center text-sm font-mono"
+                        autoComplete="current-password"
+                      />
+                    </div>
+
+                    <div className="surface-muted rounded-xl p-3.5 space-y-1.5 text-[11px] text-secondary leading-relaxed">
+                      <p className="font-semibold text-primary text-xs">What you get</p>
+                      <p>• Reproduce steps for all {MASTER_BUGS.length} intentional defects</p>
+                      <p>• Inject or disable bugs before a candidate starts</p>
+                      <p>• Review logged defects and generate scorecards</p>
+                    </div>
+
+                    <button type="submit" className="btn btn-violet w-full py-3 text-sm">
+                      Open Control Dashboard <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </form>
+                </>
               )}
-
-              <div>
-                <label className="block text-slate-700 dark:text-slate-300 mb-1 font-medium">Interviewer Pin Code</label>
-                <input
-                  type="password"
-                  placeholder="Enter Pin Code (Default: 1234)"
-                  value={adminPinInput}
-                  onChange={(e) => setAdminPinInput(e.target.value)}
-                  className="w-full p-3 glass-input rounded-xl tracking-widest text-center text-sm font-mono"
-                />
-              </div>
-
-              <div className="bg-slate-100 dark:bg-slate-900/60 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed space-y-1">
-                <strong className="text-slate-700 dark:text-slate-300 block">Interviewer Controls:</strong>
-                <p>• Access dedicated list of reproducing methods for all 17 bugs.</p>
-                <p>• Enable or disable individual bugs before handing test to candidates.</p>
-                <p>• Review logs and grade candidates automatically.</p>
-              </div>
-
-              <button
-                type="submit"
-                className="w-full py-3 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-bold rounded-xl shadow-lg transition flex items-center justify-center gap-2 text-xs"
-              >
-                Access Interview Dashboard <ArrowRight className="w-4.5 h-4.5" />
-              </button>
-            </form>
+            </div>
           </div>
+
+          <p className="mt-8 text-[11px] text-muted font-mono">BugHunt QA Assessment Platform · v2.0</p>
         </div>
       </div>
     );
   }
 
-  // Render Candidate Instructions screen if logged in but test hasn't started yet
+  // ─── Candidate Instructions ─────────────────────────────────
   if (isLoggedIn && userRole === 'candidate' && showInstructions) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 flex flex-col justify-center items-center p-4 md:p-6">
-        <div className="max-w-3xl w-full glass-panel-glow p-6 md:p-8 rounded-2xl border border-indigo-500/30 space-y-6">
-          {/* Header */}
-          <div className="text-center pb-4 border-b border-slate-200 dark:border-slate-800">
-            <h2 className="text-xl md:text-2xl font-extrabold text-slate-900 dark:text-white font-sans">Welcome, {candidateName}!</h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 font-sans">Please read the following instructions carefully before starting the test.</p>
+      <div className="app-shell min-h-screen flex flex-col justify-center items-center p-4 md:p-6">
+        <div className="absolute top-4 right-4 z-20">
+          <ThemeToggle />
+        </div>
+
+        <div className="max-w-3xl w-full glass-panel-glow p-6 md:p-8 rounded-2xl space-y-6 animate-scale-in">
+          <div className="text-center pb-5 border-b border-[var(--border)]">
+            <div className="inline-flex items-center gap-2 badge badge-brand mb-3">
+              <BookOpen className="w-3 h-3" /> Pre-Assessment Briefing
+            </div>
+            <h2 className="text-2xl md:text-3xl font-extrabold text-primary">
+              Welcome, {candidateName}
+            </h2>
+            <p className="text-sm text-secondary mt-1.5">
+              Read carefully — the timer starts only when you confirm below.
+            </p>
           </div>
 
-          {/* Core Info Blocks */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs font-mono">
-            <div className="p-3 bg-slate-100 dark:bg-slate-900/70 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center gap-2.5">
-              <Clock className="w-5 h-5 text-amber-500 shrink-0" />
-              <div>
-                <span className="text-[10px] text-slate-500 block">DURATION</span>
-                <span className="text-slate-850 dark:text-slate-200 font-bold">30 Minutes</span>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {[
+              { icon: Clock, label: 'Duration', value: '30 Minutes', color: 'text-amber-400' },
+              { icon: Bug, label: 'Sandboxes', value: '4 Live Apps', color: 'text-rose-400' },
+              { icon: Target, label: 'Scoring', value: 'Auto + Manual', color: 'text-emerald-400' }
+            ].map(({ icon: Icon, label, value, color }) => (
+              <div key={label} className="surface-muted rounded-xl p-3.5 flex items-center gap-3">
+                <Icon className={`w-5 h-5 ${color} shrink-0`} />
+                <div>
+                  <span className="text-[10px] text-muted uppercase tracking-wider block">{label}</span>
+                  <span className="text-sm font-bold text-primary">{value}</span>
+                </div>
               </div>
-            </div>
-
-            <div className="p-3 bg-slate-100 dark:bg-slate-900/70 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center gap-2.5">
-              <Bug className="w-5 h-5 text-rose-500 shrink-0" />
-              <div>
-                <span className="text-[10px] text-slate-500 block">SANDBOXES</span>
-                <span className="text-slate-850 dark:text-slate-200 font-bold">4 Simulated Apps</span>
-              </div>
-            </div>
-
-            <div className="p-3 bg-slate-100 dark:bg-slate-900/70 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center gap-2.5">
-              <CheckCircle className="w-5 h-5 text-emerald-500 shrink-0" />
-              <div>
-                <span className="text-[10px] text-slate-500 block">SUBMISSION</span>
-                <span className="text-slate-850 dark:text-slate-200 font-bold">Automatic Scoring</span>
-              </div>
-            </div>
+            ))}
           </div>
 
-          {/* Detailed Instructions list */}
-          <div className="space-y-4 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
-            <div className="space-y-2.5">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
-                Task 1: The Bug Hunt (4 Sandbox Apps)
+          <div className="space-y-5 text-sm leading-relaxed text-secondary">
+            <div className="space-y-2">
+              <h3 className="text-sm font-bold text-primary flex items-center gap-2">
+                <span className="w-6 h-6 rounded-lg bg-indigo-500/15 text-indigo-400 text-xs font-bold flex items-center justify-center border border-indigo-500/25">1</span>
+                The Bug Hunt
               </h3>
-              <p className="pl-3.5">
-                Explore the different sections of the platform using the top nav tabs:
-                🛒 <strong>ShopSphere</strong>, 👥 <strong>DeskFlow</strong>, ✈️ <strong>SkyRoutes</strong>, and 📋 <strong>TaskFlow</strong>.
-                Your goal is to test inputs, calculations, responsive views, dates, and look at the bottom console for uncaught JavaScript errors.
+              <p className="pl-8 text-xs md:text-sm">
+                Explore <strong className="text-primary">ShopSphere</strong>, <strong className="text-primary">DeskFlow</strong>,{' '}
+                <strong className="text-primary">SkyRoutes</strong>, and <strong className="text-primary">TaskFlow</strong> via the top tabs.
+                Probe inputs, calculations, layouts, dates, and the bottom console for errors.
               </p>
             </div>
 
-            <div className="space-y-2.5">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
-                Task 2: Logging Defects
+            <div className="space-y-2">
+              <h3 className="text-sm font-bold text-primary flex items-center gap-2">
+                <span className="w-6 h-6 rounded-lg bg-indigo-500/15 text-indigo-400 text-xs font-bold flex items-center justify-center border border-indigo-500/25">2</span>
+                Log Defects
               </h3>
-              <p className="pl-3.5">
-                When you find an issue, click the red <strong>"Report Defect"</strong> button in the top-right header.
-                You <strong>must map your report to the correct suspected area</strong> in the dropdown so the grading engine can automatically check and score your report. Complete the steps to reproduce, actual and expected outcomes clearly.
+              <p className="pl-8 text-xs md:text-sm">
+                Use <strong className="text-rose-400">Report Defect</strong> in the header. Map each report to the correct feature area
+                so scoring can match your findings. Include clear steps, expected vs actual behavior.
               </p>
             </div>
 
-            <div className="space-y-2.5">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
-                Task 3: Theoretical MCQ Quiz
+            <div className="space-y-2">
+              <h3 className="text-sm font-bold text-primary flex items-center gap-2">
+                <span className="w-6 h-6 rounded-lg bg-indigo-500/15 text-indigo-400 text-xs font-bold flex items-center justify-center border border-indigo-500/25">3</span>
+                Theory Quiz
               </h3>
-              <p className="pl-3.5">
-                Make sure to navigate to the <strong>"Theory Quiz"</strong> tab and answer the 8 multiple-choice testing methodology questions before your session finishes.
+              <p className="pl-8 text-xs md:text-sm">
+                Complete the <strong className="text-primary">Theory Quiz</strong> tab (8 MCQs on STLC, BVA, EP, and defect management) before time runs out.
               </p>
             </div>
 
-            <div className="p-3 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-900 rounded-xl flex items-start gap-2.5 text-[11px] text-indigo-700 dark:text-indigo-300 leading-normal">
+            <div className="alert alert-warn">
               <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
               <span>
-                <strong>Warning on Timer:</strong> Once you click start, the 30-minute timer will run continuously. If you run out of time, the platform will immediately lock and evaluate whatever you have completed up to that point.
+                <strong>Timer warning:</strong> Once started, the 30-minute clock runs continuously. At zero, the session locks and scores whatever you have submitted.
               </span>
             </div>
           </div>
 
-          {/* Action Button */}
-          <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex justify-end">
+          <div className="pt-4 border-t border-[var(--border)] flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <button type="button" onClick={handleLogout} className="btn btn-ghost">
+              <LogOut className="w-4 h-4" /> Sign Out
+            </button>
             <button
+              type="button"
               onClick={handleStartCandidateTest}
-              className="px-8 py-3.5 bg-gradient-to-r from-emerald-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 text-white font-bold rounded-xl shadow-lg transition flex items-center gap-2 text-xs animate-pulse-glow"
+              className="btn btn-success py-3 px-8 text-sm animate-pulse-glow"
             >
-              <Play className="w-4 h-4 fill-white" /> I Understand, Start Test Now
+              <Play className="w-4 h-4 fill-current" /> I Understand — Start Test
             </button>
           </div>
         </div>
@@ -364,19 +446,17 @@ export default function App() {
     );
   }
 
+  // ─── Main Application Shell ─────────────────────────────────
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 flex flex-col font-sans pb-16 transition-colors duration-300">
-      {/* Header */}
+    <div className="app-shell min-h-screen flex flex-col pb-14">
       <Header
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         mode={mode}
-        setMode={setMode}
+        setMode={handleSetMode}
+        userRole={userRole}
         onOpenReportModal={() => {
-          if (testCompleted) {
-            alert("Your assessment is completed. No more defects can be logged.");
-            return;
-          }
+          if (testCompleted) return;
           setIsReportModalOpen(true);
         }}
         candidateBugCount={candidateBugs.length}
@@ -385,93 +465,72 @@ export default function App() {
         timerActive={timerActive}
         setTimerActive={setTimerActive}
         onTimeUp={handleEndTest}
-        onEndTest={handleEndTest}
+        onEndTest={requestEndTest}
         theme={theme}
         toggleTheme={toggleTheme}
+        candidateName={candidateName}
+        onLogout={handleLogout}
+        testCompleted={testCompleted}
       />
 
-      {/* Main Body Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 md:px-6 py-5 md:py-6">
         {testCompleted && userRole === 'candidate' ? (
-          <div className="max-w-2xl mx-auto glass-panel p-8 rounded-2xl text-center space-y-5">
-            <div className="w-16 h-16 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center mx-auto border border-emerald-500/30">
-              <HelpCircle className="w-10 h-10" />
+          <div className="max-w-xl mx-auto glass-panel-glow p-8 md:p-10 rounded-2xl text-center space-y-5 animate-scale-in">
+            <div className="w-16 h-16 mx-auto rounded-2xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 flex items-center justify-center">
+              <CheckCircle className="w-9 h-9" />
             </div>
-            <h2 className="text-xl font-bold text-slate-900 dark:text-white">Assessment Closed & Submitted</h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              Your 30-minute session has ended. Your performance scorecard has been generated below.
-            </p>
-            <button
-              onClick={() => setShowAutoScorecard(true)}
-              className="px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg"
-            >
-              View My Report Card
-            </button>
-            <button
-              onClick={handleLogout}
-              className="px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-350 dark:text-slate-350 text-xs font-semibold rounded-xl ml-3"
-            >
-              Sign Out / Restart
-            </button>
+            <div>
+              <h2 className="text-xl font-bold text-primary">Assessment Submitted</h2>
+              <p className="text-sm text-secondary mt-2 leading-relaxed">
+                Your session has closed. Review your report card below, or sign out when finished.
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-1">
+              <button type="button" onClick={() => setShowAutoScorecard(true)} className="btn btn-success px-6 py-2.5">
+                <HelpCircle className="w-4 h-4" /> View Report Card
+              </button>
+              <button type="button" onClick={handleLogout} className="btn btn-ghost px-6 py-2.5">
+                <LogOut className="w-4 h-4" /> Sign Out
+              </button>
+            </div>
           </div>
         ) : (
-          <div>
+          <>
             {mode === 'candidate' ? (
-              <div>
-                {activeTab === 'shop' && (
-                  <ShopSphereApp activeBugs={activeBugIds} addLog={addLog} />
-                )}
-
-                {activeTab === 'desk' && (
-                  <DeskFlowApp activeBugs={activeBugIds} addLog={addLog} />
-                )}
-
-                {activeTab === 'sky' && (
-                  <SkyRoutesApp activeBugs={activeBugIds} addLog={addLog} />
-                )}
-
-                {activeTab === 'task' && (
-                  <TaskFlowApp activeBugs={activeBugIds} addLog={addLog} />
-                )}
-
+              <div className="animate-fade-in">
+                {activeTab === 'shop' && <ShopSphereApp activeBugs={activeBugIds} addLog={addLog} />}
+                {activeTab === 'desk' && <DeskFlowApp activeBugs={activeBugIds} addLog={addLog} />}
+                {activeTab === 'sky' && <SkyRoutesApp activeBugs={activeBugIds} addLog={addLog} />}
+                {activeTab === 'task' && <TaskFlowApp activeBugs={activeBugIds} addLog={addLog} />}
                 {activeTab === 'quiz' && (
-                  <QuizSection 
+                  <QuizSection
                     isInterviewer={false}
                     onQuizCompleted={(score, total) => {
                       setQuizScore({ score, total });
                       addLog('info', 'Assessment Quiz', `Candidate completed theoretical quiz: ${score}/${total} score.`);
-                    }} 
+                    }}
                   />
                 )}
               </div>
             ) : (
-              <div className="space-y-6">
-                {/* Admin Quick logout */}
-                <div className="flex justify-end">
-                  <button
-                    onClick={handleLogout}
-                    className="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold"
-                  >
-                    Logout Admin Control Panel
-                  </button>
-                </div>
-                <InterviewerDashboard
-                  masterBugs={MASTER_BUGS}
-                  activeBugIds={activeBugIds}
-                  onToggleBug={handleToggleBug}
-                  candidateBugs={candidateBugs}
-                  onClearCandidateBugs={() => setCandidateBugs([])}
-                  quizScore={quizScore}
-                  candidateName={candidateName}
-                  setCandidateName={setCandidateName}
-                />
-              </div>
+              <InterviewerDashboard
+                masterBugs={MASTER_BUGS}
+                activeBugIds={activeBugIds}
+                onToggleBug={handleToggleBug}
+                candidateBugs={candidateBugs}
+                onClearCandidateBugs={() => setCandidateBugs([])}
+                quizScore={quizScore}
+                candidateName={candidateName}
+                setCandidateName={setCandidateName}
+                preAuthenticated={userRole === 'admin'}
+                onLogout={handleLogout}
+              />
             )}
-          </div>
+          </>
         )}
       </main>
 
-      {/* Candidate Bug Report Modal */}
+      {/* Bug report modal */}
       <BugReportModal
         isOpen={isReportModalOpen}
         onClose={() => setIsReportModalOpen(false)}
@@ -479,20 +538,44 @@ export default function App() {
         currentApp={activeTab}
       />
 
-      {/* Auto score summary modal for candidate when test completes */}
+      {/* Scorecard */}
       <ScorecardModal
         isOpen={showAutoScorecard}
         onClose={() => setShowAutoScorecard(false)}
-        candidateReport={{ candidateName, reportedBugs: candidateBugs }}
+        candidateReport={{ candidateName, candidateEmail, reportedBugs: candidateBugs }}
         masterBugs={MASTER_BUGS.filter(b => activeBugIds.includes(b.id))}
         quizScore={quizScore}
       />
 
-      {/* Embedded DevTools Console Simulator */}
-      <ConsoleSimulator
-        logs={logs}
-        onClearLogs={() => setLogs([])}
-      />
+      {/* Submit confirmation */}
+      {showSubmitConfirm && (
+        <div className="modal-overlay" role="dialog" aria-modal="true">
+          <div className="modal-panel max-w-md glass-panel-glow p-6 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/15 text-amber-400 border border-amber-500/25 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-primary">Submit Assessment?</h3>
+                <p className="text-xs text-secondary mt-1 leading-relaxed">
+                  This ends your session permanently. You will not be able to log more defects or change quiz answers.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button type="button" onClick={() => setShowSubmitConfirm(false)} className="btn btn-ghost">
+                Keep Working
+              </button>
+              <button type="button" onClick={handleEndTest} className="btn btn-primary">
+                Confirm Submit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Console — only during active sessions */}
+      <ConsoleSimulator logs={logs} onClearLogs={() => setLogs([])} />
     </div>
   );
 }
