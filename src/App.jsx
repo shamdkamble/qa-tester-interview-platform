@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Header from './components/Header';
 import ShopSphereApp from './sandboxes/ShopSphereApp';
 import DeskFlowApp from './sandboxes/DeskFlowApp';
@@ -11,12 +11,20 @@ import ConsoleSimulator from './components/ConsoleSimulator';
 import ScorecardModal from './components/ScorecardModal';
 import { MASTER_BUGS } from './data/masterBugsList';
 import { ADMIN_PIN } from './config/auth';
+import {
+  RESTRICTED_ACCESS,
+  INVITED_EMAIL,
+  validateInvitedAccess,
+  isAccessWindowOpen,
+  getSecondsUntilAccessExpiry,
+  formatAccessDeadline
+} from './config/access';
 import { computeAssessmentScore } from './utils/scoring';
 import { addSubmission } from './utils/submissionsStore';
 import {
   User, Shield, HelpCircle, ArrowRight, Play, CheckCircle, Clock,
   AlertTriangle, Bug, Sun, Moon, Sparkles, BookOpen, LogOut,
-  ListChecks, Award, FileWarning, Terminal
+  ListChecks, Award, FileWarning, Terminal, KeyRound, Lock
 } from 'lucide-react';
 
 export default function App() {
@@ -58,9 +66,12 @@ export default function App() {
   // Login forms
   const [studentNameInput, setStudentNameInput] = useState('');
   const [studentEmailInput, setStudentEmailInput] = useState('');
+  const [accessTokenInput, setAccessTokenInput] = useState('');
+  const [candidateLoginError, setCandidateLoginError] = useState('');
   const [adminPinInput, setAdminPinInput] = useState('');
   const [adminPinError, setAdminPinError] = useState(false);
   const [loginTab, setLoginTab] = useState('candidate'); // 'candidate' | 'admin'
+  const [accessExpiredNotice, setAccessExpiredNotice] = useState(false);
 
   // Master bugs
   const [activeBugIds, setActiveBugIds] = useState(MASTER_BUGS.map(b => b.id));
@@ -70,6 +81,20 @@ export default function App() {
   const [candidateName, setCandidateName] = useState('QA Fresher Candidate');
   const [candidateEmail, setCandidateEmail] = useState('');
   const [quizScore, setQuizScore] = useState({ score: 0, total: 8 });
+
+  // Latest session snapshot for deadline auto-submit (avoids stale closures)
+  const sessionRef = useRef({});
+  sessionRef.current = {
+    testCompleted,
+    candidateBugs,
+    candidateName,
+    candidateEmail,
+    quizScore,
+    activeBugIds,
+    timeLeft,
+    userRole,
+    isLoggedIn
+  };
 
   // Console logs
   const [logs, setLogs] = useState([
@@ -125,7 +150,19 @@ export default function App() {
 
   const handleStudentLogin = (e) => {
     e.preventDefault();
+    setCandidateLoginError('');
     if (!studentNameInput.trim() || !studentEmailInput.trim()) return;
+
+    if (RESTRICTED_ACCESS) {
+      const result = validateInvitedAccess({
+        email: studentEmailInput,
+        token: accessTokenInput
+      });
+      if (!result.ok) {
+        setCandidateLoginError(result.error);
+        return;
+      }
+    }
 
     setCandidateName(studentNameInput.trim());
     setCandidateEmail(studentEmailInput.trim());
@@ -133,16 +170,27 @@ export default function App() {
     setMode('candidate');
     setIsLoggedIn(true);
     setShowInstructions(true);
+    setAccessExpiredNotice(false);
   };
 
   const handleStartCandidateTest = () => {
+    // Assessment runs until access deadline (6 PM IST), not a fixed 30-min only window
+    const secs = RESTRICTED_ACCESS
+      ? Math.max(60, getSecondsUntilAccessExpiry())
+      : 1800;
+    setTimeLeft(secs);
     setShowInstructions(false);
     setTimerActive(true);
-    addLog('info', 'Assessment System', `Candidate "${candidateName}" acknowledged instructions and started the 30-minute test.`);
+    addLog(
+      'info',
+      'Assessment System',
+      `Candidate "${candidateName}" started the assessment. Access deadline: ${formatAccessDeadline()}.`
+    );
   };
 
   const handleAdminLogin = (e) => {
     e.preventDefault();
+    // Admin remains fully available (not blocked by candidate restriction)
     if (adminPinInput === ADMIN_PIN) {
       setUserRole('admin');
       setMode('interviewer');
@@ -154,30 +202,38 @@ export default function App() {
     }
   };
 
-  const handleEndTest = () => {
-    if (testCompleted) return;
+  const handleEndTest = useCallback((reason = 'manual') => {
+    const snap = sessionRef.current;
+    if (snap.testCompleted) return;
 
-    const activeMaster = MASTER_BUGS.filter(b => activeBugIds.includes(b.id));
+    const bugs = snap.candidateBugs || [];
+    const qScore = snap.quizScore || { score: 0, total: 8 };
+    const name = snap.candidateName;
+    const email = snap.candidateEmail;
+    const bugIds = snap.activeBugIds || [];
+    const remaining = snap.timeLeft ?? 0;
+
+    const activeMaster = MASTER_BUGS.filter(b => bugIds.includes(b.id));
     const scoring = computeAssessmentScore({
-      reportedBugs: candidateBugs,
+      reportedBugs: bugs,
       masterBugs: activeMaster,
-      quizScore
+      quizScore: qScore
     });
 
-    // Persist for admin Reports Library (same browser localStorage)
     try {
       addSubmission({
-        candidateName,
-        candidateEmail,
-        reportedBugs: candidateBugs,
-        quizScore,
-        activeBugIds: [...activeBugIds],
+        candidateName: name,
+        candidateEmail: email,
+        reportedBugs: bugs,
+        quizScore: qScore,
+        activeBugIds: [...bugIds],
         activeMasterBugs: activeMaster,
         scoring,
-        timeLeft,
-        durationSeconds: 1800
+        timeLeft: remaining,
+        durationSeconds: RESTRICTED_ACCESS ? getSecondsUntilAccessExpiry() + remaining : 1800,
+        submitReason: reason
       });
-      addLog('info', 'Report Archive', `Submission saved for admin review — ${candidateName} (${scoring.composite}%, ${scoring.grade}).`);
+      addLog('info', 'Report Archive', `Submission saved — ${name} (${scoring.composite}%, ${scoring.grade}).`);
     } catch (err) {
       addLog('error', 'Report Archive', 'Failed to persist submission to browser storage.');
       console.error(err);
@@ -187,13 +243,37 @@ export default function App() {
     setTestCompleted(true);
     setShowAutoScorecard(true);
     setShowSubmitConfirm(false);
-    addLog('warn', 'Assessment System', 'Assessment session ended. Auto-scoring report generated.');
-  };
+    setIsReportModalOpen(false);
+
+    if (reason === 'access_deadline') {
+      setAccessExpiredNotice(true);
+      addLog('warn', 'Assessment System', 'Access deadline reached (6:00 PM IST). Assessment auto-submitted.');
+    } else {
+      addLog('warn', 'Assessment System', 'Assessment session ended. Auto-scoring report generated.');
+    }
+  }, []);
 
   const requestEndTest = () => {
     if (testCompleted) return;
     setShowSubmitConfirm(true);
   };
+
+  // Hard deadline: at 6 PM IST auto-submit candidate work and lock further testing
+  useEffect(() => {
+    if (!RESTRICTED_ACCESS) return;
+
+    const tick = () => {
+      if (isAccessWindowOpen()) return;
+      const snap = sessionRef.current;
+      if (snap.isLoggedIn && snap.userRole === 'candidate' && !snap.testCompleted) {
+        handleEndTest('access_deadline');
+      }
+    };
+
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [handleEndTest]);
 
   const handleLogout = () => {
     setIsLoggedIn(false);
@@ -207,12 +287,15 @@ export default function App() {
     setQuizScore({ score: 0, total: 8 });
     setStudentNameInput('');
     setStudentEmailInput('');
+    setAccessTokenInput('');
+    setCandidateLoginError('');
     setAdminPinInput('');
     setAdminPinError(false);
     setActiveTab('shop');
     setShowAutoScorecard(false);
     setShowSubmitConfirm(false);
     setCandidateEmail('');
+    setAccessExpiredNotice(false);
   };
 
   // Role-safe mode change: candidates cannot open interviewer panel
@@ -260,13 +343,17 @@ export default function App() {
             <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
               <span className="badge badge-brand">4 Sandbox Apps</span>
               <span className="badge badge-medium">{MASTER_BUGS.length} Injected Defects</span>
-              <span className="badge badge-low">Live Scoring</span>
+              {RESTRICTED_ACCESS ? (
+                <span className="badge badge-critical">Invite-only candidate</span>
+              ) : (
+                <span className="badge badge-low">Live Scoring</span>
+              )}
             </div>
           </div>
 
           {/* Auth card */}
           <div className="w-full max-w-lg glass-panel-glow rounded-2xl p-1 animate-scale-in">
-            {/* Segmented control */}
+            {/* Segmented control — admin always available */}
             <div className="nav-track m-3 mb-0">
               <button
                 type="button"
@@ -288,51 +375,107 @@ export default function App() {
               {loginTab === 'candidate' ? (
                 <>
                   <div>
-                    <h2 className="text-lg font-bold text-primary">Start Assessment</h2>
-                    <p className="text-xs text-secondary mt-0.5">Enter your details to review guidelines and begin.</p>
+                    <h2 className="text-lg font-bold text-primary">Invited Candidate Access</h2>
+                    <p className="text-xs text-secondary mt-0.5">
+                      Enter your name, authorized email, and access token to begin.
+                    </p>
                   </div>
 
-                  <form onSubmit={handleStudentLogin} className="space-y-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-secondary mb-1.5">Full Name</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="e.g. Alex Rivera"
-                        value={studentNameInput}
-                        onChange={(e) => setStudentNameInput(e.target.value)}
-                        className="glass-input"
-                        autoComplete="name"
-                      />
+                  {RESTRICTED_ACCESS && !isAccessWindowOpen() ? (
+                    <div className="alert alert-error">
+                      <Lock className="w-4 h-4 shrink-0" />
+                      <span>
+                        Candidate access is closed. The deadline was <strong>6:00 PM IST</strong> ({formatAccessDeadline()}).
+                        Contact your interviewer if you need support.
+                      </span>
                     </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-secondary mb-1.5">Email Address</label>
-                      <input
-                        type="email"
-                        required
-                        placeholder="alex.rivera@example.com"
-                        value={studentEmailInput}
-                        onChange={(e) => setStudentEmailInput(e.target.value)}
-                        className="glass-input font-mono"
-                        autoComplete="email"
-                      />
-                    </div>
+                  ) : (
+                    <form onSubmit={handleStudentLogin} className="space-y-4">
+                      {candidateLoginError && (
+                        <div className="alert alert-error">
+                          <AlertTriangle className="w-4 h-4 shrink-0" />
+                          <span>{candidateLoginError}</span>
+                        </div>
+                      )}
 
-                    <div className="alert alert-info">
-                      <Sparkles className="w-4 h-4 shrink-0 mt-0.5" />
-                      <span>You will see full instructions before the 30-minute timer starts. No pressure until you click Start.</span>
-                    </div>
+                      {RESTRICTED_ACCESS && (
+                        <div className="alert alert-warn text-[11px]">
+                          <Clock className="w-4 h-4 shrink-0 mt-0.5" />
+                          <span>
+                            Invite-only session. Deadline: <strong className="text-primary">6:00 PM IST today</strong>
+                            {' '}({formatAccessDeadline()}). At the deadline, unfinished work is auto-submitted.
+                          </span>
+                        </div>
+                      )}
 
-                    <button type="submit" className="btn btn-success w-full py-3 text-sm">
-                      Continue to Instructions <ArrowRight className="w-4 h-4" />
-                    </button>
-                  </form>
+                      <div>
+                        <label className="block text-xs font-semibold text-secondary mb-1.5">Full Name</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Your full name"
+                          value={studentNameInput}
+                          onChange={(e) => setStudentNameInput(e.target.value)}
+                          className="glass-input"
+                          autoComplete="name"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-secondary mb-1.5">Email Address</label>
+                        <input
+                          type="email"
+                          required
+                          placeholder={RESTRICTED_ACCESS ? INVITED_EMAIL : 'you@example.com'}
+                          value={studentEmailInput}
+                          onChange={(e) => {
+                            setStudentEmailInput(e.target.value);
+                            setCandidateLoginError('');
+                          }}
+                          className="glass-input font-mono"
+                          autoComplete="email"
+                        />
+                      </div>
+                      {RESTRICTED_ACCESS && (
+                        <div>
+                          <label className="block text-xs font-semibold text-secondary mb-1.5 flex items-center gap-1.5">
+                            <KeyRound className="w-3.5 h-3.5" /> Access Token
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="Paste the token shared with you"
+                            value={accessTokenInput}
+                            onChange={(e) => {
+                              setAccessTokenInput(e.target.value);
+                              setCandidateLoginError('');
+                            }}
+                            className="glass-input font-mono text-sm"
+                            autoComplete="off"
+                            spellCheck={false}
+                          />
+                        </div>
+                      )}
+
+                      <div className="alert alert-info">
+                        <Sparkles className="w-4 h-4 shrink-0 mt-0.5" />
+                        <span>
+                          After login you will read full instructions. The session clock starts only when you click Start Test.
+                        </span>
+                      </div>
+
+                      <button type="submit" className="btn btn-success w-full py-3 text-sm">
+                        Continue to Instructions <ArrowRight className="w-4 h-4" />
+                      </button>
+                    </form>
+                  )}
                 </>
               ) : (
                 <>
                   <div>
                     <h2 className="text-lg font-bold text-primary">Interviewer Access</h2>
-                    <p className="text-xs text-secondary mt-0.5">Unlock bug controls, session review, and scoring.</p>
+                    <p className="text-xs text-secondary mt-0.5">
+                      Admin access remains open. Unlock bug controls, reports library, and scoring.
+                    </p>
                   </div>
 
                   <form onSubmit={handleAdminLogin} className="space-y-4">
@@ -397,14 +540,19 @@ export default function App() {
               Welcome, {candidateName}
             </h2>
             <p className="text-sm text-secondary mt-1.5 max-w-lg mx-auto leading-relaxed">
-              Read this fully before starting. The 30-minute timer begins only after you click{' '}
+              Read this fully before starting. The session clock begins only after you click{' '}
               <strong className="text-primary">Start Test</strong> at the bottom.
             </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {[
-              { icon: Clock, label: 'Duration', value: '30 Minutes', color: 'text-amber-400' },
+              {
+                icon: Clock,
+                label: 'Deadline',
+                value: RESTRICTED_ACCESS ? 'Today 6:00 PM IST' : '30 Minutes',
+                color: 'text-amber-400'
+              },
               { icon: Bug, label: 'Sandboxes', value: '4 Live Apps', color: 'text-rose-400' },
               { icon: Award, label: 'Scoring', value: '75% Hunt + 25% Quiz', color: 'text-emerald-400' }
             ].map(({ icon: Icon, label, value, color }) => (
@@ -616,9 +764,19 @@ export default function App() {
             <div className="alert alert-warn">
               <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
               <span className="text-[11px] md:text-xs leading-relaxed">
-                <strong>Timer:</strong> After you start, the clock runs continuously for 30 minutes. At 00:00 the platform auto-submits
-                and scores whatever defects and quiz answers you have. Work methodically — quality reports on important bugs beat
-                rushing many weak ones.
+                <strong>Hard deadline:</strong>{' '}
+                {RESTRICTED_ACCESS ? (
+                  <>
+                    You may report bugs until <strong>6:00 PM IST today</strong> ({formatAccessDeadline()}).
+                    When the deadline hits, the platform <strong>auto-submits</strong> whatever defects and quiz answers you have and
+                    blocks further access. You can also submit earlier via <strong>Submit Test</strong>.
+                  </>
+                ) : (
+                  <>
+                    After you start, the clock runs continuously. At 00:00 the platform auto-submits and scores whatever you completed.
+                  </>
+                )}
+                {' '}Work methodically — quality reports on important bugs beat rushing many weak ones.
               </span>
             </div>
           </div>
@@ -658,7 +816,7 @@ export default function App() {
         setTimeLeft={setTimeLeft}
         timerActive={timerActive}
         setTimerActive={setTimerActive}
-        onTimeUp={handleEndTest}
+        onTimeUp={() => handleEndTest('timer')}
         onEndTest={requestEndTest}
         theme={theme}
         toggleTheme={toggleTheme}
@@ -676,7 +834,9 @@ export default function App() {
             <div>
               <h2 className="text-xl font-bold text-primary">Assessment Submitted</h2>
               <p className="text-sm text-secondary mt-2 leading-relaxed">
-                Your session has closed. Review your report card below, or sign out when finished.
+                {accessExpiredNotice
+                  ? 'Access deadline (6:00 PM IST) was reached. Your work was auto-submitted and candidate access is now locked.'
+                  : 'Your session has closed. Review your report card below, or sign out when finished.'}
               </p>
             </div>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-1">
@@ -760,7 +920,7 @@ export default function App() {
               <button type="button" onClick={() => setShowSubmitConfirm(false)} className="btn btn-ghost">
                 Keep Working
               </button>
-              <button type="button" onClick={handleEndTest} className="btn btn-primary">
+              <button type="button" onClick={() => handleEndTest('manual')} className="btn btn-primary">
                 Confirm Submit
               </button>
             </div>
