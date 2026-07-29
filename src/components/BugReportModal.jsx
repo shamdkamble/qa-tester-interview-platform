@@ -34,35 +34,14 @@ export default function BugReportModal({ isOpen, onClose, onSubmitBug, currentAp
   };
 
   const handleBugSelection = (bugId) => {
-    if (bugId === 'other') {
-      setBugData(prev => ({
-        ...prev,
-        bugId: 'other',
-        title: '',
-        category: 'Functional',
-        severity: 'Medium'
-      }));
-      return;
-    }
-
-    const selectedMaster = MASTER_BUGS.find(b => b.id === bugId);
-    if (selectedMaster) {
-      setBugData(prev => ({
-        ...prev,
-        bugId,
-        title: selectedMaster.title,
-        category: selectedMaster.category,
-        severity: selectedMaster.severity
-      }));
-    } else {
-      setBugData(prev => ({
-        ...prev,
-        bugId: '',
-        title: '',
-        category: 'Functional',
-        severity: 'Medium'
-      }));
-    }
+    setBugData(prev => ({
+      ...prev,
+      bugId,
+      // Keep title, category, severity blank/default so they fill it in manually
+      title: '',
+      category: 'Functional',
+      severity: 'Medium'
+    }));
   };
 
   const handleSubmit = (e) => {
@@ -94,10 +73,8 @@ export default function BugReportModal({ isOpen, onClose, onSubmitBug, currentAp
     }, 1200);
   };
 
-  const isCustom = bugData.bugId === 'other';
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
       <div className="w-full max-w-xl glass-panel-glow p-6 rounded-2xl space-y-4 relative border border-indigo-500/30">
         <button 
           onClick={onClose}
@@ -112,7 +89,7 @@ export default function BugReportModal({ isOpen, onClose, onSubmitBug, currentAp
           </div>
           <div>
             <h3 className="text-lg font-bold text-slate-100">Log QA Defect Report</h3>
-            <p className="text-xs text-slate-400">Map your report to a sandbox area or submit a custom bug report</p>
+            <p className="text-xs text-slate-400">Describe the bug and link it to a functional feature area</p>
           </div>
         </div>
 
@@ -142,20 +119,20 @@ export default function BugReportModal({ isOpen, onClose, onSubmitBug, currentAp
               </div>
 
               <div>
-                <label className="block text-slate-300 mb-1 font-semibold">Suspected Bug Area / Issue *</label>
+                <label className="block text-slate-300 mb-1 font-semibold">Suspected Feature Area *</label>
                 <select
                   value={bugData.bugId}
                   onChange={(e) => handleBugSelection(e.target.value)}
                   required
                   className="w-full p-2.5 glass-input rounded-lg bg-slate-900 text-slate-200"
                 >
-                  <option value="">-- Choose Bug Area --</option>
+                  <option value="">-- Choose Feature Area --</option>
                   {availableBugs.map(bug => (
                     <option key={bug.id} value={bug.id}>
-                      {bug.title.slice(0, 45)}...
+                      {bug.featureArea}
                     </option>
                   ))}
-                  <option value="other">Other (Custom / Unlisted Defect)</option>
+                  <option value="other">Other / Custom Component</option>
                 </select>
               </div>
             </div>
@@ -165,60 +142,41 @@ export default function BugReportModal({ isOpen, onClose, onSubmitBug, currentAp
               <input
                 type="text"
                 required
-                readOnly={!isCustom}
-                placeholder={isCustom ? "Enter custom bug title..." : "Auto-populated based on selected Bug Area"}
+                placeholder="Describe the defect summary in your own words..."
                 value={bugData.title}
-                onChange={(e) => isCustom && setBugData({ ...bugData, title: e.target.value })}
-                className={`w-full p-2.5 glass-input rounded-lg ${!isCustom ? 'opacity-80 bg-slate-955' : ''}`}
+                onChange={(e) => setBugData({ ...bugData, title: e.target.value })}
+                className="w-full p-2.5 glass-input rounded-lg"
               />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-slate-300 mb-1 font-semibold">Category *</label>
-                {isCustom ? (
-                  <select
-                    value={bugData.category}
-                    onChange={(e) => setBugData({ ...bugData, category: e.target.value })}
-                    className="w-full p-2.5 glass-input rounded-lg bg-slate-900 text-slate-200"
-                  >
-                    <option>Functional</option>
-                    <option>Boundary Value Analysis</option>
-                    <option>UI / Layout</option>
-                    <option>Console / Network Error</option>
-                    <option>Security / Sanitization</option>
-                  </select>
-                ) : (
-                  <input
-                    type="text"
-                    readOnly
-                    value={bugData.category}
-                    className="w-full p-2.5 glass-input rounded-lg opacity-85"
-                  />
-                )}
+                <select
+                  value={bugData.category}
+                  onChange={(e) => setBugData({ ...bugData, category: e.target.value })}
+                  className="w-full p-2.5 glass-input rounded-lg bg-slate-900 text-slate-200"
+                >
+                  <option>Functional</option>
+                  <option>Boundary Value Analysis</option>
+                  <option>UI / Layout</option>
+                  <option>Console / Network Error</option>
+                  <option>Security / Sanitization</option>
+                </select>
               </div>
 
               <div>
                 <label className="block text-slate-300 mb-1 font-semibold">Severity Level *</label>
-                {isCustom ? (
-                  <select
-                    value={bugData.severity}
-                    onChange={(e) => setBugData({ ...bugData, severity: e.target.value })}
-                    className="w-full p-2.5 glass-input rounded-lg bg-slate-900 text-slate-200"
-                  >
-                    <option>Low</option>
-                    <option>Medium</option>
-                    <option>High</option>
-                    <option>Critical</option>
-                  </select>
-                ) : (
-                  <input
-                    type="text"
-                    readOnly
-                    value={bugData.severity}
-                    className="w-full p-2.5 glass-input rounded-lg opacity-85"
-                  />
-                )}
+                <select
+                  value={bugData.severity}
+                  onChange={(e) => setBugData({ ...bugData, severity: e.target.value })}
+                  className="w-full p-2.5 glass-input rounded-lg bg-slate-900 text-slate-200"
+                >
+                  <option>Low</option>
+                  <option>Medium</option>
+                  <option>High</option>
+                  <option>Critical</option>
+                </select>
               </div>
             </div>
 
@@ -227,7 +185,7 @@ export default function BugReportModal({ isOpen, onClose, onSubmitBug, currentAp
               <textarea
                 required
                 rows={3}
-                placeholder="1. Open cart&#10;2. Add product worth $200&#10;3. Apply coupon code SAVE20&#10;4. Observe discount total"
+                placeholder="1. Open app&#10;2. Interact with component&#10;3. Observe the behavior"
                 value={bugData.stepsToReproduce}
                 onChange={(e) => setBugData({ ...bugData, stepsToReproduce: e.target.value })}
                 className="w-full p-2.5 glass-input rounded-lg font-mono"
@@ -281,4 +239,3 @@ export default function BugReportModal({ isOpen, onClose, onSubmitBug, currentAp
     </div>
   );
 }
-
