@@ -10,6 +10,8 @@ import BugReportModal from './components/BugReportModal';
 import ConsoleSimulator from './components/ConsoleSimulator';
 import ScorecardModal from './components/ScorecardModal';
 import { MASTER_BUGS } from './data/masterBugsList';
+import { computeAssessmentScore } from './utils/scoring';
+import { addSubmission } from './utils/submissionsStore';
 import {
   User, Shield, HelpCircle, ArrowRight, Play, CheckCircle, Clock,
   AlertTriangle, Bug, Sun, Moon, Sparkles, Target, BookOpen, LogOut
@@ -151,6 +153,34 @@ export default function App() {
   };
 
   const handleEndTest = () => {
+    if (testCompleted) return;
+
+    const activeMaster = MASTER_BUGS.filter(b => activeBugIds.includes(b.id));
+    const scoring = computeAssessmentScore({
+      reportedBugs: candidateBugs,
+      masterBugs: activeMaster,
+      quizScore
+    });
+
+    // Persist for admin Reports Library (same browser localStorage)
+    try {
+      addSubmission({
+        candidateName,
+        candidateEmail,
+        reportedBugs: candidateBugs,
+        quizScore,
+        activeBugIds: [...activeBugIds],
+        activeMasterBugs: activeMaster,
+        scoring,
+        timeLeft,
+        durationSeconds: 1800
+      });
+      addLog('info', 'Report Archive', `Submission saved for admin review — ${candidateName} (${scoring.composite}%, ${scoring.grade}).`);
+    } catch (err) {
+      addLog('error', 'Report Archive', 'Failed to persist submission to browser storage.');
+      console.error(err);
+    }
+
     setTimerActive(false);
     setTestCompleted(true);
     setShowAutoScorecard(true);

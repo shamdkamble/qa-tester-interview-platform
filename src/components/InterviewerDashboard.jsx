@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import {
-  Key, Power, Award, Sliders, Trash2, FileText, Bug, LogOut, CheckCircle2
+  Key, Power, Award, Sliders, Trash2, FileText, Bug, LogOut, CheckCircle2, Library
 } from 'lucide-react';
 import ScorecardModal from './ScorecardModal';
+import AdminReports from './AdminReports';
+import { loadSubmissions } from '../utils/submissionsStore';
 
 export default function InterviewerDashboard({
   masterBugs,
@@ -21,6 +23,8 @@ export default function InterviewerDashboard({
   const [pinError, setPinError] = useState(false);
   const [showScorecard, setShowScorecard] = useState(false);
   const [filterApp, setFilterApp] = useState('all');
+  const [dashTab, setDashTab] = useState('reports'); // default to reports so admin sees library first
+  const [savedCount, setSavedCount] = useState(() => loadSubmissions().length);
 
   const handlePinSubmit = (e) => {
     e.preventDefault();
@@ -41,7 +45,7 @@ export default function InterviewerDashboard({
           </div>
           <div>
             <h2 className="text-xl font-bold text-primary">Interviewer Control Suite</h2>
-            <p className="text-xs text-secondary mt-1">Enter PIN to access bug toggles & candidate scoring</p>
+            <p className="text-xs text-secondary mt-1">Enter PIN to access bug toggles, reports library & scoring</p>
           </div>
 
           <form onSubmit={handlePinSubmit} className="space-y-4 text-left">
@@ -95,24 +99,28 @@ export default function InterviewerDashboard({
                 <CheckCircle2 className="w-3 h-3" /> Authenticated
               </span>
             </h2>
-            <p className="text-xs text-secondary">Inject defects in real time · Review candidate reports · Score sessions</p>
+            <p className="text-xs text-secondary">Reports library · Bug injection · Live session scoring</p>
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-2 text-xs">
-            <label className="text-muted whitespace-nowrap">Candidate</label>
-            <input
-              type="text"
-              value={candidateName}
-              onChange={(e) => setCandidateName(e.target.value)}
-              className="glass-input py-1.5 w-40 text-xs font-semibold"
-              placeholder="Name"
-            />
-          </div>
-          <button type="button" onClick={() => setShowScorecard(true)} className="btn btn-success">
-            <Award className="w-4 h-4" /> Generate Scorecard
-          </button>
+          {dashTab === 'controls' && (
+            <>
+              <div className="flex items-center gap-2 text-xs">
+                <label className="text-muted whitespace-nowrap">Live candidate</label>
+                <input
+                  type="text"
+                  value={candidateName}
+                  onChange={(e) => setCandidateName(e.target.value)}
+                  className="glass-input py-1.5 w-40 text-xs font-semibold"
+                  placeholder="Name"
+                />
+              </div>
+              <button type="button" onClick={() => setShowScorecard(true)} className="btn btn-success">
+                <Award className="w-4 h-4" /> Live Scorecard
+              </button>
+            </>
+          )}
           {onLogout && (
             <button type="button" onClick={onLogout} className="btn btn-ghost">
               <LogOut className="w-4 h-4" /> Logout
@@ -121,141 +129,167 @@ export default function InterviewerDashboard({
         </div>
       </div>
 
-      {/* Stats strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          { label: 'Active Bugs', value: activeCount, sub: `of ${masterBugs.length}` },
-          { label: 'Logged Reports', value: candidateBugs.length, sub: 'this session' },
-          { label: 'Quiz Score', value: `${quizScore?.score ?? 0}/${quizScore?.total ?? 8}`, sub: 'theory' },
-          { label: 'Disabled', value: masterBugs.length - activeCount, sub: 'bugs off' }
-        ].map(s => (
-          <div key={s.label} className="glass-panel rounded-xl p-3.5">
-            <div className="text-[10px] text-muted uppercase tracking-wider">{s.label}</div>
-            <div className="text-xl font-extrabold text-primary font-mono mt-0.5">{s.value}</div>
-            <div className="text-[10px] text-secondary">{s.sub}</div>
-          </div>
-        ))}
+      {/* Dashboard tabs */}
+      <div className="nav-track w-full sm:w-auto">
+        <button
+          type="button"
+          onClick={() => {
+            setDashTab('reports');
+            setSavedCount(loadSubmissions().length);
+          }}
+          className={`nav-pill ${dashTab === 'reports' ? 'active' : ''}`}
+        >
+          <Library className="w-3.5 h-3.5" />
+          Candidate Reports
+          {savedCount > 0 && (
+            <span className="ml-1 px-1.5 py-0.5 rounded-md bg-white/15 text-[10px] font-bold">{savedCount}</span>
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={() => setDashTab('controls')}
+          className={`nav-pill ${dashTab === 'controls' ? 'active' : ''}`}
+        >
+          <Bug className="w-3.5 h-3.5" />
+          Bug Controls & Live Session
+        </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Bug injector */}
-        <div className="lg:col-span-2 space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <h3 className="section-label flex items-center gap-2">
-              <Bug className="w-3.5 h-3.5 text-violet-400" />
-              Intentional Bugs ({activeCount} active)
-            </h3>
-            <div className="nav-track">
-              {apps.map(a => (
-                <button
-                  key={a.id}
-                  type="button"
-                  onClick={() => setFilterApp(a.id)}
-                  className={`nav-pill ${filterApp === a.id ? 'active' : ''}`}
-                >
-                  {a.label}
-                </button>
-              ))}
-            </div>
+      {dashTab === 'reports' ? (
+        <AdminReports onRefreshNeeded={() => setSavedCount(loadSubmissions().length)} />
+      ) : (
+        <>
+          {/* Stats strip */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {[
+              { label: 'Active Bugs', value: activeCount, sub: `of ${masterBugs.length}` },
+              { label: 'Live Logs', value: candidateBugs.length, sub: 'this session' },
+              { label: 'Quiz Score', value: `${quizScore?.score ?? 0}/${quizScore?.total ?? 8}`, sub: 'theory' },
+              { label: 'Saved Reports', value: savedCount, sub: 'in library' }
+            ].map(s => (
+              <div key={s.label} className="glass-panel rounded-xl p-3.5">
+                <div className="text-[10px] text-muted uppercase tracking-wider">{s.label}</div>
+                <div className="text-xl font-extrabold text-primary font-mono mt-0.5">{s.value}</div>
+                <div className="text-[10px] text-secondary">{s.sub}</div>
+              </div>
+            ))}
           </div>
 
-          <div className="space-y-3">
-            {filteredBugs.map((bug) => {
-              const isEnabled = activeBugIds.includes(bug.id);
-              const sevClass =
-                bug.severity === 'Critical' ? 'badge-critical' :
-                bug.severity === 'High' ? 'badge-high' :
-                bug.severity === 'Medium' ? 'badge-medium' : 'badge-low';
-
-              return (
-                <div
-                  key={bug.id}
-                  className={`glass-panel p-4 rounded-xl transition ${
-                    isEnabled
-                      ? 'border-indigo-500/30 shadow-lg shadow-indigo-500/5'
-                      : 'opacity-55'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="space-y-2 min-w-0">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="badge badge-brand font-mono">{bug.appName}</span>
-                        <span className={`badge ${sevClass}`}>{bug.severity}</span>
-                        <span className="text-[11px] text-muted">{bug.category}</span>
-                      </div>
-                      <h4 className="font-bold text-primary text-sm leading-snug">{bug.title}</h4>
-                      <p className="text-xs text-secondary leading-relaxed">{bug.description}</p>
-                      <div className="text-[11px] font-mono text-indigo-300 bg-indigo-500/10 p-2.5 rounded-lg border border-indigo-500/20 leading-relaxed">
-                        <strong className="text-indigo-200">How to trigger:</strong> {bug.howToReproduce}
-                      </div>
-                    </div>
-
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Bug injector */}
+            <div className="lg:col-span-2 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <h3 className="section-label flex items-center gap-2">
+                  <Bug className="w-3.5 h-3.5 text-violet-400" />
+                  Intentional Bugs ({activeCount} active)
+                </h3>
+                <div className="nav-track">
+                  {apps.map(a => (
                     <button
+                      key={a.id}
                       type="button"
-                      onClick={() => onToggleBug(bug.id)}
-                      className={`btn shrink-0 text-[11px] ${
+                      onClick={() => setFilterApp(a.id)}
+                      className={`nav-pill ${filterApp === a.id ? 'active' : ''}`}
+                    >
+                      {a.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {filteredBugs.map((bug) => {
+                  const isEnabled = activeBugIds.includes(bug.id);
+                  const sevClass =
+                    bug.severity === 'Critical' ? 'badge-critical' :
+                    bug.severity === 'High' ? 'badge-high' :
+                    bug.severity === 'Medium' ? 'badge-medium' : 'badge-low';
+
+                  return (
+                    <div
+                      key={bug.id}
+                      className={`glass-panel p-4 rounded-xl transition ${
                         isEnabled
-                          ? 'bg-rose-500/15 text-rose-300 border border-rose-500/30 hover:bg-rose-500/25'
-                          : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/25'
+                          ? 'border-indigo-500/30 shadow-lg shadow-indigo-500/5'
+                          : 'opacity-55'
                       }`}
                     >
-                      <Power className="w-3.5 h-3.5" />
-                      {isEnabled ? 'ON' : 'OFF'}
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="space-y-2 min-w-0">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="badge badge-brand font-mono">{bug.appName}</span>
+                            <span className={`badge ${sevClass}`}>{bug.severity}</span>
+                            <span className="text-[11px] text-muted">{bug.category}</span>
+                          </div>
+                          <h4 className="font-bold text-primary text-sm leading-snug">{bug.title}</h4>
+                          <p className="text-xs text-secondary leading-relaxed">{bug.description}</p>
+                          <div className="text-[11px] font-mono text-indigo-300 bg-indigo-500/10 p-2.5 rounded-lg border border-indigo-500/20 leading-relaxed">
+                            <strong className="text-indigo-200">How to trigger:</strong> {bug.howToReproduce}
+                          </div>
+                        </div>
 
-        {/* Candidate reports */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="section-label flex items-center gap-2">
-              <FileText className="w-3.5 h-3.5 text-emerald-400" />
-              Logged Bugs ({candidateBugs.length})
-            </h3>
-            {candidateBugs.length > 0 && (
-              <button type="button" onClick={onClearCandidateBugs} className="text-[11px] text-rose-400 hover:underline flex items-center gap-1">
-                <Trash2 className="w-3 h-3" /> Clear
-              </button>
-            )}
-          </div>
-
-          <div className="glass-panel p-4 rounded-xl space-y-3 min-h-[400px]">
-            {candidateBugs.length === 0 ? (
-              <div className="text-center py-16 text-muted text-xs space-y-2">
-                <Bug className="w-8 h-8 mx-auto opacity-30" />
-                <p>No defects logged yet.</p>
-                <p className="text-[11px] opacity-70">Candidate reports appear here in real time.</p>
+                        <button
+                          type="button"
+                          onClick={() => onToggleBug(bug.id)}
+                          className={`btn shrink-0 text-[11px] ${
+                            isEnabled
+                              ? 'bg-rose-500/15 text-rose-300 border border-rose-500/30 hover:bg-rose-500/25'
+                              : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/25'
+                          }`}
+                        >
+                          <Power className="w-3.5 h-3.5" />
+                          {isEnabled ? 'ON' : 'OFF'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            ) : (
-              candidateBugs.map((bug) => (
-                <div key={bug.id} className="surface-muted rounded-xl p-3 space-y-2 text-xs">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-bold text-primary truncate">{bug.title}</span>
-                    <span className="text-[10px] text-muted font-mono shrink-0">{bug.reportedAt}</span>
+            </div>
+
+            {/* Live session logs */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="section-label flex items-center gap-2">
+                  <FileText className="w-3.5 h-3.5 text-emerald-400" />
+                  Live Session Logs ({candidateBugs.length})
+                </h3>
+                {candidateBugs.length > 0 && (
+                  <button type="button" onClick={onClearCandidateBugs} className="text-[11px] text-rose-400 hover:underline flex items-center gap-1">
+                    <Trash2 className="w-3 h-3" /> Clear
+                  </button>
+                )}
+              </div>
+
+              <div className="glass-panel p-4 rounded-xl space-y-3 min-h-[400px]">
+                {candidateBugs.length === 0 ? (
+                  <div className="text-center py-16 text-muted text-xs space-y-2">
+                    <Bug className="w-8 h-8 mx-auto opacity-30" />
+                    <p>No live defects in this browser session.</p>
+                    <p className="text-[11px] opacity-70">Submitted assessments appear under Candidate Reports.</p>
                   </div>
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="badge badge-brand">{String(bug.appId).toUpperCase()}</span>
-                    <span className="badge badge-medium">{bug.severity}</span>
-                    {bug.bugId && bug.bugId !== 'other' && (
-                      <span className="text-[10px] text-muted font-mono truncate max-w-[120px]">{bug.bugId}</span>
-                    )}
-                  </div>
-                  <p className="text-[11px] text-secondary line-clamp-2 leading-relaxed">
-                    <strong className="text-primary">Steps:</strong> {bug.stepsToReproduce}
-                  </p>
-                  <div className="pt-1.5 border-t border-[var(--border)] text-[10px] text-emerald-400/90">
-                    Expected: {bug.expectedBehavior}
-                  </div>
-                </div>
-              ))
-            )}
+                ) : (
+                  candidateBugs.map((bug) => (
+                    <div key={bug.id} className="surface-muted rounded-xl p-3 space-y-2 text-xs">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-bold text-primary truncate">{bug.title}</span>
+                        <span className="text-[10px] text-muted font-mono shrink-0">{bug.reportedAt}</span>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="badge badge-brand">{String(bug.appId).toUpperCase()}</span>
+                        <span className="badge badge-medium">{bug.severity}</span>
+                      </div>
+                      <p className="text-[11px] text-secondary line-clamp-2 leading-relaxed">
+                        <strong className="text-primary">Steps:</strong> {bug.stepsToReproduce}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+        </>
+      )}
 
       <ScorecardModal
         isOpen={showScorecard}
