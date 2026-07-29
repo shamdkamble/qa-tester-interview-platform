@@ -5,6 +5,7 @@ import {
 import ScorecardModal from './ScorecardModal';
 import AdminReports from './AdminReports';
 import { loadSubmissions } from '../utils/submissionsStore';
+import { ADMIN_PIN } from '../config/auth';
 
 export default function InterviewerDashboard({
   masterBugs,
@@ -28,7 +29,7 @@ export default function InterviewerDashboard({
 
   const handlePinSubmit = (e) => {
     e.preventDefault();
-    if (pinInput === '1234' || pinInput === 'admin') {
+    if (pinInput === ADMIN_PIN) {
       setIsAuthenticated(true);
       setPinError(false);
     } else {
@@ -51,15 +52,15 @@ export default function InterviewerDashboard({
           <form onSubmit={handlePinSubmit} className="space-y-4 text-left">
             {pinError && (
               <div className="alert alert-error">
-                Incorrect PIN. Default: <strong className="font-mono">1234</strong>
+                Incorrect PIN. Please try again or contact the assessment administrator.
               </div>
             )}
             <input
               type="password"
-              placeholder="Access PIN"
+              placeholder="Enter access PIN"
               value={pinInput}
               onChange={(e) => setPinInput(e.target.value)}
-              className="glass-input text-center font-mono text-base tracking-[0.35em]"
+              className="glass-input text-center font-mono text-base tracking-[0.2em]"
             />
             <button type="submit" className="btn btn-violet w-full py-3">
               Unlock Controls

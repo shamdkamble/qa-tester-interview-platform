@@ -10,11 +10,13 @@ import BugReportModal from './components/BugReportModal';
 import ConsoleSimulator from './components/ConsoleSimulator';
 import ScorecardModal from './components/ScorecardModal';
 import { MASTER_BUGS } from './data/masterBugsList';
+import { ADMIN_PIN } from './config/auth';
 import { computeAssessmentScore } from './utils/scoring';
 import { addSubmission } from './utils/submissionsStore';
 import {
   User, Shield, HelpCircle, ArrowRight, Play, CheckCircle, Clock,
-  AlertTriangle, Bug, Sun, Moon, Sparkles, Target, BookOpen, LogOut
+  AlertTriangle, Bug, Sun, Moon, Sparkles, Target, BookOpen, LogOut,
+  ListChecks, Award, FileWarning, Terminal
 } from 'lucide-react';
 
 export default function App() {
@@ -141,7 +143,7 @@ export default function App() {
 
   const handleAdminLogin = (e) => {
     e.preventDefault();
-    if (adminPinInput === '1234' || adminPinInput === 'admin') {
+    if (adminPinInput === ADMIN_PIN) {
       setUserRole('admin');
       setMode('interviewer');
       setIsLoggedIn(true);
@@ -337,9 +339,7 @@ export default function App() {
                     {adminPinError && (
                       <div className="alert alert-error">
                         <AlertTriangle className="w-4 h-4 shrink-0" />
-                        <span>
-                          Invalid PIN. Default passcode: <strong className="font-mono text-primary">1234</strong>
-                        </span>
+                        <span>Invalid PIN. Please try again or contact the assessment administrator.</span>
                       </div>
                     )}
 
@@ -347,13 +347,13 @@ export default function App() {
                       <label className="block text-xs font-semibold text-secondary mb-1.5">Access PIN</label>
                       <input
                         type="password"
-                        placeholder="Enter PIN (default: 1234)"
+                        placeholder="Enter access PIN"
                         value={adminPinInput}
                         onChange={(e) => {
                           setAdminPinInput(e.target.value);
                           setAdminPinError(false);
                         }}
-                        className="glass-input tracking-[0.35em] text-center text-sm font-mono"
+                        className="glass-input tracking-[0.2em] text-center text-sm font-mono"
                         autoComplete="current-password"
                       />
                     </div>
@@ -362,7 +362,7 @@ export default function App() {
                       <p className="font-semibold text-primary text-xs">What you get</p>
                       <p>• Reproduce steps for all {MASTER_BUGS.length} intentional defects</p>
                       <p>• Inject or disable bugs before a candidate starts</p>
-                      <p>• Review logged defects and generate scorecards</p>
+                      <p>• Review saved candidate reports and scorecards</p>
                     </div>
 
                     <button type="submit" className="btn btn-violet w-full py-3 text-sm">
@@ -383,7 +383,7 @@ export default function App() {
   // ─── Candidate Instructions ─────────────────────────────────
   if (isLoggedIn && userRole === 'candidate' && showInstructions) {
     return (
-      <div className="app-shell min-h-screen flex flex-col justify-center items-center p-4 md:p-6">
+      <div className="app-shell min-h-screen flex flex-col items-center p-4 md:p-6 py-8 md:py-10">
         <div className="absolute top-4 right-4 z-20">
           <ThemeToggle />
         </div>
@@ -391,13 +391,14 @@ export default function App() {
         <div className="max-w-3xl w-full glass-panel-glow p-6 md:p-8 rounded-2xl space-y-6 animate-scale-in">
           <div className="text-center pb-5 border-b border-[var(--border)]">
             <div className="inline-flex items-center gap-2 badge badge-brand mb-3">
-              <BookOpen className="w-3 h-3" /> Pre-Assessment Briefing
+              <BookOpen className="w-3 h-3" /> Candidate Instructions
             </div>
             <h2 className="text-2xl md:text-3xl font-extrabold text-primary">
               Welcome, {candidateName}
             </h2>
-            <p className="text-sm text-secondary mt-1.5">
-              Read carefully — the timer starts only when you confirm below.
+            <p className="text-sm text-secondary mt-1.5 max-w-lg mx-auto leading-relaxed">
+              Read this fully before starting. The 30-minute timer begins only after you click{' '}
+              <strong className="text-primary">Start Test</strong> at the bottom.
             </p>
           </div>
 
@@ -405,7 +406,7 @@ export default function App() {
             {[
               { icon: Clock, label: 'Duration', value: '30 Minutes', color: 'text-amber-400' },
               { icon: Bug, label: 'Sandboxes', value: '4 Live Apps', color: 'text-rose-400' },
-              { icon: Target, label: 'Scoring', value: 'Auto + Manual', color: 'text-emerald-400' }
+              { icon: Award, label: 'Scoring', value: '75% Hunt + 25% Quiz', color: 'text-emerald-400' }
             ].map(({ icon: Icon, label, value, color }) => (
               <div key={label} className="surface-muted rounded-xl p-3.5 flex items-center gap-3">
                 <Icon className={`w-5 h-5 ${color} shrink-0`} />
@@ -417,44 +418,207 @@ export default function App() {
             ))}
           </div>
 
-          <div className="space-y-5 text-sm leading-relaxed text-secondary">
-            <div className="space-y-2">
+          <div className="space-y-6 text-secondary max-h-[55vh] overflow-y-auto pr-1">
+            {/* Goal */}
+            <section className="space-y-2">
               <h3 className="text-sm font-bold text-primary flex items-center gap-2">
                 <span className="w-6 h-6 rounded-lg bg-indigo-500/15 text-indigo-400 text-xs font-bold flex items-center justify-center border border-indigo-500/25">1</span>
-                The Bug Hunt
+                What you are being tested on
               </h3>
-              <p className="pl-8 text-xs md:text-sm">
-                Explore <strong className="text-primary">ShopSphere</strong>, <strong className="text-primary">DeskFlow</strong>,{' '}
-                <strong className="text-primary">SkyRoutes</strong>, and <strong className="text-primary">TaskFlow</strong> via the top tabs.
-                Probe inputs, calculations, layouts, dates, and the bottom console for errors.
-              </p>
-            </div>
+              <div className="pl-8 space-y-2 text-xs md:text-sm leading-relaxed">
+                <p>
+                  This is a <strong className="text-primary">QA intern assessment</strong>. You will explore four mock product apps that contain
+                  intentional defects. Your job is to <strong className="text-primary">find bugs, log them properly</strong>, and complete a short theory quiz.
+                </p>
+                <p>
+                  Apps are real interactive UIs (not screenshots). Click around, change inputs, submit forms, resize the window,
+                  and open the bottom <strong className="text-primary">DevTools Console</strong> for errors and warnings.
+                </p>
+              </div>
+            </section>
 
-            <div className="space-y-2">
+            {/* Sandboxes */}
+            <section className="space-y-2">
               <h3 className="text-sm font-bold text-primary flex items-center gap-2">
                 <span className="w-6 h-6 rounded-lg bg-indigo-500/15 text-indigo-400 text-xs font-bold flex items-center justify-center border border-indigo-500/25">2</span>
-                Log Defects
+                The four sandbox apps (top tabs)
               </h3>
-              <p className="pl-8 text-xs md:text-sm">
-                Use <strong className="text-rose-400">Report Defect</strong> in the header. Map each report to the correct feature area
-                so scoring can match your findings. Include clear steps, expected vs actual behavior.
-              </p>
-            </div>
+              <div className="pl-8 space-y-2 text-xs md:text-sm leading-relaxed">
+                <ul className="space-y-1.5 list-disc pl-4">
+                  <li><strong className="text-primary">ShopSphere</strong> — e-commerce: cart, promo codes, checkout, card validation, layout</li>
+                  <li><strong className="text-primary">DeskFlow</strong> — user signup, directory, password/DOB rules, settings/cloud sync, XSS</li>
+                  <li><strong className="text-primary">SkyRoutes</strong> — flight search: dates, passengers, currency conversion</li>
+                  <li><strong className="text-primary">TaskFlow</strong> — tasks, checklists, priority edits, chat scroll, HTML in descriptions</li>
+                </ul>
+                <p className="text-muted">
+                  Tip: try invalid values, empty fields, negative numbers, future dates, rapid double-clicks, and currency/date edge cases.
+                </p>
+              </div>
+            </section>
 
-            <div className="space-y-2">
+            {/* How to raise bugs */}
+            <section className="space-y-2">
               <h3 className="text-sm font-bold text-primary flex items-center gap-2">
-                <span className="w-6 h-6 rounded-lg bg-indigo-500/15 text-indigo-400 text-xs font-bold flex items-center justify-center border border-indigo-500/25">3</span>
-                Theory Quiz
+                <span className="w-6 h-6 rounded-lg bg-rose-500/15 text-rose-400 text-xs font-bold flex items-center justify-center border border-rose-500/25">3</span>
+                How to raise a bug on this platform
               </h3>
-              <p className="pl-8 text-xs md:text-sm">
-                Complete the <strong className="text-primary">Theory Quiz</strong> tab (8 MCQs on STLC, BVA, EP, and defect management) before time runs out.
-              </p>
-            </div>
+              <div className="pl-8 space-y-3 text-xs md:text-sm leading-relaxed">
+                <p>
+                  When you find something wrong, click the red <strong className="text-rose-400">Report Defect</strong> button in the top header.
+                  A form opens. Fill it carefully — incomplete reports score lower.
+                </p>
+
+                <div className="surface-muted rounded-xl p-3.5 space-y-2.5">
+                  <p className="font-semibold text-primary flex items-center gap-1.5 text-xs">
+                    <ListChecks className="w-3.5 h-3.5 text-indigo-400" /> Step-by-step defect form
+                  </p>
+                  <ol className="list-decimal pl-4 space-y-2 text-[11px] md:text-xs">
+                    <li>
+                      <strong className="text-primary">Affected Application</strong> — pick which sandbox (ShopSphere, DeskFlow, SkyRoutes, or TaskFlow).
+                    </li>
+                    <li>
+                      <strong className="text-primary">Suspected Feature Area</strong> — this is critical for scoring.
+                      Choose the dropdown option that best matches where the bug lives (e.g. promo code, password validator, return date).
+                      If nothing fits, choose <em>Other / Custom Component</em>.
+                    </li>
+                    <li>
+                      <strong className="text-primary">Defect Title</strong> — short clear summary in your own words
+                      (e.g. “Promo SAVE20 applies $20 flat instead of 20%”).
+                    </li>
+                    <li>
+                      <strong className="text-primary">Category &amp; Severity</strong> — your best judgment (Functional, BVA, UI, Security, etc.).
+                      Note: your final hunt score uses the platform’s master severity of matched bugs, not only what you select here.
+                    </li>
+                    <li>
+                      <strong className="text-primary">Steps to Reproduce</strong> — numbered steps someone else can follow exactly
+                      (open app → action → observe).
+                    </li>
+                    <li>
+                      <strong className="text-primary">Expected Behavior</strong> — what should happen if the product were correct.
+                    </li>
+                    <li>
+                      <strong className="text-primary">Actual Behavior</strong> — what you observed instead.
+                    </li>
+                    <li>
+                      Click <strong className="text-rose-400">Submit Defect</strong>. The counter on Report Defect increases. Log each distinct issue separately.
+                    </li>
+                  </ol>
+                </div>
+
+                <div className="alert alert-info text-[11px] md:text-xs">
+                  <FileWarning className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>
+                    <strong>Why Feature Area matters:</strong> scoring matches your report to intentional injected bugs using that dropdown.
+                    Wrong mapping = no credit for that intentional bug even if you described it well. Prefer the closest area over “Other” when possible.
+                  </span>
+                </div>
+
+                <div className="alert alert-info text-[11px] md:text-xs">
+                  <Terminal className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>
+                    <strong>Console:</strong> expand the bottom “DevTools Console” bar. Errors and warnings while you test can reveal bugs
+                    (e.g. sync failures). Log those as defects too if they indicate product issues.
+                  </span>
+                </div>
+              </div>
+            </section>
+
+            {/* Grading */}
+            <section className="space-y-2">
+              <h3 className="text-sm font-bold text-primary flex items-center gap-2">
+                <span className="w-6 h-6 rounded-lg bg-emerald-500/15 text-emerald-400 text-xs font-bold flex items-center justify-center border border-emerald-500/25">4</span>
+                How you are graded
+              </h3>
+              <div className="pl-8 space-y-3 text-xs md:text-sm leading-relaxed">
+                <p>
+                  Your final score is a <strong className="text-primary">composite</strong>:
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="surface-muted rounded-xl p-3">
+                    <div className="text-[10px] text-muted uppercase tracking-wider">Bug Hunt</div>
+                    <div className="text-lg font-extrabold text-emerald-400 font-mono">75%</div>
+                    <p className="text-[11px] text-secondary mt-1">Weighted by how severe the matched intentional bugs are.</p>
+                  </div>
+                  <div className="surface-muted rounded-xl p-3">
+                    <div className="text-[10px] text-muted uppercase tracking-wider">Theory Quiz</div>
+                    <div className="text-lg font-extrabold text-cyan-400 font-mono">25%</div>
+                    <p className="text-[11px] text-secondary mt-1">8 MCQs on STLC, BVA, EP, defect lifecycle.</p>
+                  </div>
+                </div>
+
+                <p className="font-semibold text-primary text-xs">Bug hunt points (impact tiers)</p>
+                <div className="grid grid-cols-3 gap-2 text-center text-[11px]">
+                  <div className="surface-muted rounded-lg p-2.5">
+                    <span className="badge badge-critical">Critical</span>
+                    <p className="mt-2 text-primary font-bold">Highest points</p>
+                    <p className="text-muted mt-0.5">Critical &amp; High master bugs (e.g. security, major validation)</p>
+                  </div>
+                  <div className="surface-muted rounded-lg p-2.5">
+                    <span className="badge badge-high">Mid</span>
+                    <p className="mt-2 text-primary font-bold">Medium points</p>
+                    <p className="text-muted mt-0.5">Medium-severity logic / calculation issues</p>
+                  </div>
+                  <div className="surface-muted rounded-lg p-2.5">
+                    <span className="badge badge-low">Low</span>
+                    <p className="mt-2 text-primary font-bold">Lowest points</p>
+                    <p className="text-muted mt-0.5">UI/layout polish issues — still count, worth less</p>
+                  </div>
+                </div>
+
+                <ul className="space-y-1.5 list-disc pl-4 text-[11px] md:text-xs">
+                  <li>Finding more <strong className="text-primary">Critical-tier</strong> defects raises your grade faster than many Low UI issues alone.</li>
+                  <li>Clear steps + expected vs actual keep full points; very thin write-ups may reduce credit slightly.</li>
+                  <li>Custom “Other” findings can add a small participation bonus if well written, but do not replace mapped intentional bugs.</li>
+                  <li>You do <strong className="text-primary">not</strong> need to find every bug to pass — solid coverage of important issues + decent quiz is enough for a strong intern score.</li>
+                </ul>
+
+                <div className="surface-muted rounded-xl p-3 text-[11px] md:text-xs space-y-1">
+                  <p className="font-semibold text-primary">Indicative grade bands</p>
+                  <p><strong className="text-emerald-400">S / A</strong> — strong impact findings + good quiz → recommended for internship</p>
+                  <p><strong className="text-amber-400">B</strong> — promising base → often second-round</p>
+                  <p><strong className="text-cyan-400">C</strong> — developing — coaching needed</p>
+                  <p><strong className="text-rose-400">D</strong> — below current intern bar</p>
+                </div>
+              </div>
+            </section>
+
+            {/* Quiz */}
+            <section className="space-y-2">
+              <h3 className="text-sm font-bold text-primary flex items-center gap-2">
+                <span className="w-6 h-6 rounded-lg bg-indigo-500/15 text-indigo-400 text-xs font-bold flex items-center justify-center border border-indigo-500/25">5</span>
+                Theory Quiz tab
+              </h3>
+              <div className="pl-8 space-y-2 text-xs md:text-sm leading-relaxed">
+                <p>
+                  Open <strong className="text-primary">Theory Quiz</strong> in the top navigation. Answer all 8 questions, then click{' '}
+                  <strong className="text-primary">Lock In Answers</strong>. After lock-in you cannot change answers.
+                </p>
+                <p className="text-muted">
+                  Do not leave the quiz for the last second — time-up auto-submits whatever is complete.
+                </p>
+              </div>
+            </section>
+
+            {/* Submit */}
+            <section className="space-y-2">
+              <h3 className="text-sm font-bold text-primary flex items-center gap-2">
+                <span className="w-6 h-6 rounded-lg bg-indigo-500/15 text-indigo-400 text-xs font-bold flex items-center justify-center border border-indigo-500/25">6</span>
+                Ending the test
+              </h3>
+              <div className="pl-8 space-y-2 text-xs md:text-sm leading-relaxed">
+                <p>
+                  When finished (or when time is almost up), click <strong className="text-primary">Submit Test</strong> in the header.
+                  Confirm once — the session locks, your scorecard is generated, and your report is saved for the interviewer.
+                </p>
+              </div>
+            </section>
 
             <div className="alert alert-warn">
               <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>
-                <strong>Timer warning:</strong> Once started, the 30-minute clock runs continuously. At zero, the session locks and scores whatever you have submitted.
+              <span className="text-[11px] md:text-xs leading-relaxed">
+                <strong>Timer:</strong> After you start, the clock runs continuously for 30 minutes. At 00:00 the platform auto-submits
+                and scores whatever defects and quiz answers you have. Work methodically — quality reports on important bugs beat
+                rushing many weak ones.
               </span>
             </div>
           </div>
